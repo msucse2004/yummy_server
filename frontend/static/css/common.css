@@ -1,0 +1,219 @@
+:root {
+  --bg: #1a1a2e;
+  --card: #16213e;
+  --accent: #0f3460;
+  --highlight: #e94560;
+  --text: #eee;
+  --muted: #aaa;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+.login-box {
+  background: var(--card);
+  padding: clamp(1.25rem, 4vw, 2rem);
+  border-radius: 12px;
+  width: 100%;
+  max-width: min(420px, 92vw);
+  min-width: min(280px, 100%);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+
+.login-box h1 {
+  margin: 0 0 0.25rem;
+  font-size: clamp(1.25rem, 4vw + 0.5rem, 1.75rem);
+  word-break: keep-all;
+}
+
+.login-box .subtitle {
+  color: var(--muted);
+  margin: 0 0 1.5rem;
+  font-size: clamp(0.8rem, 2vw + 0.4rem, 0.9rem);
+}
+
+.login-box input {
+  width: 100%;
+  padding: clamp(0.65rem, 2vw, 0.75rem) 1rem;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+  font-size: clamp(0.9rem, 2.5vw, 1rem);
+}
+
+.login-box button {
+  width: 100%;
+  padding: clamp(0.7rem, 2vw, 0.85rem) 1rem;
+  margin-top: 0.5rem;
+  background: var(--highlight);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: clamp(0.95rem, 2.5vw, 1rem);
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+/* 로그인 반응형 */
+@media (max-width: 480px) {
+  .login-page { padding: 0.75rem; }
+  .login-box { border-radius: 10px; }
+}
+
+@media (min-width: 768px) {
+  .login-box { max-width: 420px; }
+}
+
+.login-box .error {
+  color: var(--highlight);
+  font-size: 0.9rem;
+  margin-top: 1rem;
+}
+
+/* App shell */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app-header {
+  background: var(--card);
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--accent);
+}
+
+.app-header h1 { margin: 0; font-size: 1.25rem; }
+
+.app-header .logout {
+  padding: 0.4rem 0.8rem;
+  background: transparent;
+  border: 1px solid var(--muted);
+  color: var(--text);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.app-content { flex: 1; padding: 1rem; }
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--card);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+th, td { padding: 0.75rem 1rem; text-align: left; }
+th { background: var(--accent); font-weight: 600; }
+tr:nth-child(even) { background: rgba(255,255,255,0.02); }
+
+/* Buttons */
+.btn {
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.btn-primary { background: var(--highlight); color: white; }
+.btn-secondary { background: var(--accent); color: var(--text); }
+
+/* Cards */
+.card {
+  background: var(--card);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.card h2 { margin: 0 0 0.75rem; font-size: 1.1rem; }
+
+/* Forms */
+.form-group { margin-bottom: 1rem; }
+.form-group label { display: block; margin-bottom: 0.35rem; color: var(--muted); font-size: 0.9rem; }
+.form-group input, .form-group select {
+  width: 100%;
+  padding: 0.6rem;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+}
+.form-group select {
+  color: #000;
+  background: #fff;
+}
+.form-group select option {
+  color: #000;
+  background: #fff;
+}
+
+/* Nav tabs */
+.nav-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--accent);
+}
+
+.nav-tabs a {
+  padding: 0.6rem 1rem;
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+}
+
+.nav-tabs a:hover, .nav-tabs a.active { color: var(--text); border-bottom-color: var(--highlight); }
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-box {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 1.5rem;
+  min-width: 320px;
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+.modal-box h3 { margin: 0 0 1rem; font-size: 1.1rem; }
+.modal-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  justify-content: flex-end;
+}

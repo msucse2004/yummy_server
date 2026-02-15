@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Yummy - 로그인</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="/css/common.css">
+</head>
+<body class="login-page">
+  <main class="login-box">
+    <h1>Yummy (주) 맛나 콩나물물</h1>
+    <p class="subtitle">배송/물류 관리</p>
+    <form id="loginForm">
+      <input type="text" id="username" placeholder="아이디" required autocomplete="username">
+      <input type="password" id="password" placeholder="비밀번호" required autocomplete="current-password">
+      <button type="submit">로그인</button>
+    </form>
+    <p id="error" class="error"></p>
+  </main>
+  <script src="/js/api.js"></script>
+  <script>
+    (async () => {
+      const user = await api.me();
+      if (user) {
+        location.href = user.role === 'ADMIN' ? '/admin.html' : '/driver.html';
+        return;
+      }
+    })();
+
+    document.getElementById('loginForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const err = document.getElementById('error');
+      err.textContent = '';
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      try {
+        const res = await api.login(username, password);
+        if (res.ok) {
+          location.href = res.user.role === 'ADMIN' ? '/admin.html' : '/driver.html';
+        } else {
+          err.textContent = res.detail || '로그인 실패';
+        }
+      } catch (e) {
+        err.textContent = e.detail || e.message || '로그인 실패';
+      }
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: yummy
+      POSTGRES_PASSWORD: yummy_secret
+      POSTGRES_DB: yummy
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5433:5432"  # 5432 충돌 시 5433 사용 (로컬 접속 시 포트 변경)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U yummy"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://yummy:yummy_secret@db:5432/yummy
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production-use-32-chars}
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN:-localhost}
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - uploads_data:/app/uploads
+    expose:
+      - "8000"
+    # Cloudflare Tunnel 사용 시 외부 포트 불필요
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    depends_on:
+      - backend
+    ports:
+      - "127.0.0.1:8081:80"  # 8080 충돌 시 8081 사용
+
+volumes:
+  pgdata:
+  uploads_data:
