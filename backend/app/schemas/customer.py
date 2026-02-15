@@ -1,4 +1,5 @@
 """거래처 스키마"""
+from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -13,6 +14,8 @@ class CustomerBase(BaseModel):
     address: str | None = None
     phone: str | None = Field(None, max_length=32)
     contract: ContractType | None = None
+    latitude: Decimal | float | None = None
+    longitude: Decimal | float | None = None
     memo: str | None = None
 
 
@@ -27,6 +30,8 @@ class CustomerUpdate(BaseModel):
     address: str | None = None
     phone: str | None = Field(None, max_length=32)
     contract: ContractType | None = None
+    latitude: Decimal | float | None = None
+    longitude: Decimal | float | None = None
     memo: str | None = None
 
 

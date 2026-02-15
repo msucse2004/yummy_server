@@ -19,6 +19,8 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
+    env_file:
+      - .env
     depends_on:
       db:
         condition: service_healthy
@@ -27,6 +29,7 @@ services:
       SECRET_KEY: ${SECRET_KEY:-change-me-in-production-use-32-chars}
       COOKIE_DOMAIN: ${COOKIE_DOMAIN:-localhost}
       UPLOAD_DIR: /app/uploads
+      KAKAO_REST_API_KEY: ${KAKAO_REST_API_KEY:-}
     volumes:
       - uploads_data:/app/uploads
     expose:

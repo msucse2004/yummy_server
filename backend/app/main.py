@@ -9,7 +9,7 @@ from app.logging_config import configure_logging
 configure_logging(os.getenv("LOG_LEVEL", "INFO"))
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, customers, items, plans, routes, stops, completions, users, uploads, reports
+from app.api import auth, customers, items, plans, routes, stops, completions, users, uploads, reports, settings as settings_api
 from app.config import get_settings
 
 settings = get_settings()
@@ -46,6 +46,7 @@ app.include_router(completions.router)
 app.include_router(users.router)
 app.include_router(uploads.router)
 app.include_router(reports.router)
+app.include_router(settings_api.router)
 
 # 업로드 파일은 /api/uploads/photo/{id} 통해 인증 후 다운로드
 

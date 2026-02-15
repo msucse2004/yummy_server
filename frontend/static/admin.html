@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Yummy - 관리자</title>
+  <title>(주) 맛나 콩나물 - 관리자</title>
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="/css/common.css">
 </head>
 <body>
   <div class="app-shell">
     <header class="app-header">
-      <h1>Yummy 관리자</h1>
+      <h1>(주) 맛나 콩나물 관리자</h1>
       <button class="logout" onclick="doLogout()">로그아웃</button>
     </header>
     <main class="app-content">
@@ -20,15 +20,38 @@
         <a href="#" data-tab="items">품목</a>
         <a href="#" data-tab="users">사용자</a>
         <a href="#" data-tab="reports">리포트</a>
+        <a href="#" data-tab="settings">설정</a>
       </nav>
 
       <div id="tab-plans" class="tab-content">
         <div class="card">
           <h2>플랜 목록</h2>
-          <p><a href="#" class="btn btn-primary" onclick="showPlanForm()">+ 새 플랜</a></p>
-          <table><thead><tr><th>날짜</th><th>이름</th><th></th></tr></thead><tbody id="plansList"></tbody></table>
+          <p><button class="btn btn-primary" onclick="showPlanForm()">+ 새 플랜</button></p>
+          <table><thead><tr><th>루트</th><th>이름</th><th></th></tr></thead><tbody id="plansList"></tbody></table>
         </div>
         <div id="planDetail" style="display:none"></div>
+      </div>
+
+      <div id="planModal" class="modal-overlay" style="display:none" onclick="if(event.target===this) closePlanModal()">
+        <div class="modal-box" onclick="event.stopPropagation()">
+          <h3>새 플랜</h3>
+          <form id="planForm">
+            <div class="form-group">
+              <label for="planRoute">루트 *</label>
+              <select id="planRoute" required>
+                <option value="">선택</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="planName">이름 *</label>
+              <input type="text" id="planName" required placeholder="플랜 이름">
+            </div>
+            <div class="modal-actions">
+              <button type="button" class="btn btn-secondary" onclick="closePlanModal()">취소</button>
+              <button type="submit" class="btn btn-primary">저장</button>
+            </div>
+          </form>
+        </div>
       </div>
 
       <div id="tab-customers" class="tab-content" style="display:none">
@@ -43,23 +66,100 @@
             </label>
             <button class="btn btn-secondary" type="button" onclick="deleteAllCustomers()" style="color:var(--highlight)">거래처 전체 지우기</button>
           </p>
-          <table><thead><tr><th>코드</th><th>루트</th><th>이름</th><th>연락처</th><th>계약</th><th>주소</th><th></th></tr></thead><tbody id="customersList"></tbody></table>
+          <table><thead><tr>
+  <th class="sortable" data-sort="code">코드 <span class="sort-icon"></span></th>
+  <th class="sortable" data-sort="route">루트 <span class="sort-icon"></span></th>
+  <th class="sortable" data-sort="name">이름 <span class="sort-icon"></span></th>
+  <th class="sortable" data-sort="phone">연락처 <span class="sort-icon"></span></th>
+  <th class="sortable" data-sort="contract">계약 <span class="sort-icon"></span></th>
+  <th class="sortable" data-sort="address">주소 <span class="sort-icon"></span></th>
+  <th class="sortable" data-sort="latitude">위도 <span class="sort-icon"></span></th>
+  <th class="sortable" data-sort="longitude">경도 <span class="sort-icon"></span></th>
+  <th></th>
+</tr></thead><tbody id="customersList"></tbody></table>
         </div>
       </div>
 
       <div id="tab-items" class="tab-content" style="display:none">
         <div class="card">
           <h2>품목</h2>
-          <p><button class="btn btn-primary" onclick="showItemForm()">+ 추가</button></p>
-          <table><thead><tr><th>코드</th><th>이름</th><th>단위</th><th>단가</th><th></th></tr></thead><tbody id="itemsList"></tbody></table>
+          <p>
+            <button class="btn btn-primary" type="button" onclick="showItemForm()">+ 추가</button>
+            <button class="btn btn-secondary" type="button" onclick="exportItemsExcel()">Excel 내보내기</button>
+            <label class="btn btn-secondary" style="margin:0; cursor:pointer">
+              Excel 가져오기
+              <input type="file" id="itemExcelInput" accept=".xlsx" style="display:none" onchange="importItemsExcel(event)">
+            </label>
+          </p>
+          <table><thead><tr><th>코드</th><th>상품</th><th>무게</th><th>단위</th><th>단가 (원)</th><th></th></tr></thead><tbody id="itemsList"></tbody></table>
         </div>
       </div>
 
       <div id="tab-users" class="tab-content" style="display:none">
         <div class="card">
           <h2>사용자</h2>
-          <p><button class="btn btn-primary" onclick="showUserForm()">+ 기사 추가</button></p>
-          <table><thead><tr><th>아이디</th><th>역할</th><th>이름</th></tr></thead><tbody id="usersList"></tbody></table>
+          <p>
+            <button class="btn btn-primary" type="button" onclick="showUserForm()">+ 추가</button>
+            <button class="btn btn-secondary" type="button" onclick="exportUsersExcel()">Excel 내보내기</button>
+            <label class="btn btn-secondary" style="margin:0; cursor:pointer">
+              Excel 가져오기
+              <input type="file" id="userExcelInput" accept=".xlsx" style="display:none" onchange="importUsersExcel(event)">
+            </label>
+          </p>
+          <table><thead><tr><th>아이디</th><th>권한</th><th>이름</th><th>주민번호</th><th>전화번호</th><th>이력서</th><th>상태</th><th></th></tr></thead><tbody id="usersList"></tbody></table>
+        </div>
+      </div>
+
+      <div id="userModal" class="modal-overlay" style="display:none" onclick="if(event.target===this) closeUserModal()">
+        <div class="modal-box" onclick="event.stopPropagation()">
+          <h3 id="userModalTitle">사용자 추가</h3>
+          <form id="userForm">
+            <input type="hidden" id="userId" value="">
+            <div class="form-group">
+              <label for="userUsername">아이디 *</label>
+              <input type="text" id="userUsername" required placeholder="아이디" autocomplete="username">
+            </div>
+            <div class="form-group" id="userPasswordGroup">
+              <label for="userPassword">비밀번호 *</label>
+              <input type="password" id="userPassword" placeholder="6자 이상" minlength="6" autocomplete="new-password">
+            </div>
+            <div class="form-group">
+              <label for="userDisplayName">이름</label>
+              <input type="text" id="userDisplayName" placeholder="이름">
+            </div>
+            <div class="form-group">
+              <label for="userRole">권한</label>
+              <select id="userRole">
+                <option value="DRIVER">기사</option>
+                <option value="ADMIN">관리자</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="userSsn">주민번호</label>
+              <input type="text" id="userSsn" placeholder="주민번호">
+            </div>
+            <div class="form-group">
+              <label for="userPhone">전화번호</label>
+              <input type="text" id="userPhone" placeholder="전화번호">
+            </div>
+            <div class="form-group">
+              <label for="userResume">이력서</label>
+              <input type="text" id="userResume" placeholder="이력서">
+            </div>
+            <div class="form-group">
+              <label for="userStatus">상태</label>
+              <select id="userStatus">
+                <option value="">선택</option>
+                <option value="승인요청중">승인요청중</option>
+                <option value="재직">재직</option>
+                <option value="퇴사">퇴사</option>
+              </select>
+            </div>
+            <div class="modal-actions">
+              <button type="button" class="btn btn-secondary" onclick="closeUserModal()">취소</button>
+              <button type="submit" class="btn btn-primary">저장</button>
+            </div>
+          </form>
         </div>
       </div>
 
@@ -73,7 +173,63 @@
           </p>
         </div>
       </div>
+
+      <div id="tab-settings" class="tab-content" style="display:none">
+        <div class="card">
+          <h2>설정</h2>
+          <form id="settingsForm">
+            <div class="form-group">
+              <label for="settingCompanyName">회사 이름</label>
+              <input type="text" id="settingCompanyName" placeholder="회사 이름">
+            </div>
+            <div class="form-group">
+              <label for="settingCompanyAddress">회사 주소</label>
+              <input type="text" id="settingCompanyAddress" placeholder="회사 주소">
+            </div>
+            <div class="form-group">
+              <label for="settingCompanyPhone">회사 전화번호</label>
+              <input type="text" id="settingCompanyPhone" placeholder="회사 전화번호">
+            </div>
+            <div class="form-group">
+              <label for="settingDeliveryRouteCount">배달 루트</label>
+              <input type="number" id="settingDeliveryRouteCount" min="1" max="99" placeholder="개수"> 개
+            </div>
+            <div class="modal-actions">
+              <button type="submit" class="btn btn-primary">저장</button>
+            </div>
+          </form>
+        </div>
+      </div>
     </main>
+  </div>
+
+  <div id="itemModal" class="modal-overlay" style="display:none" onclick="if(event.target===this) closeItemModal()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <h3 id="itemModalTitle">품목 추가</h3>
+      <form id="itemForm">
+        <input type="hidden" id="itemId" value="">
+        <div class="form-group">
+          <label for="itemProduct">상품 *</label>
+          <input type="text" id="itemProduct" required placeholder="상품명">
+        </div>
+        <div class="form-group">
+          <label for="itemWeight">무게</label>
+          <input type="number" id="itemWeight" placeholder="무게" step="any" min="0">
+        </div>
+        <div class="form-group">
+          <label for="itemUnit">단위</label>
+          <input type="text" id="itemUnit" placeholder="단위 (예: EA, kg)" value="EA">
+        </div>
+        <div class="form-group">
+          <label for="itemUnitPrice">단가 (원)</label>
+          <input type="number" id="itemUnitPrice" placeholder="원" step="1" min="0">
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeItemModal()">취소</button>
+          <button type="submit" class="btn btn-primary">저장</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <div id="customerModal" class="modal-overlay" style="display:none" onclick="if(event.target===this) closeCustomerModal()">
@@ -108,6 +264,14 @@
         <div class="form-group">
           <label for="customerAddress">주소</label>
           <input type="text" id="customerAddress" placeholder="주소">
+        </div>
+        <div class="form-group">
+          <label for="customerLatitude">위도</label>
+          <input type="number" id="customerLatitude" placeholder="위도 (예: 37.5666805)" step="any">
+        </div>
+        <div class="form-group">
+          <label for="customerLongitude">경도</label>
+          <input type="number" id="customerLongitude" placeholder="경도 (예: 126.9784147)" step="any">
         </div>
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" onclick="closeCustomerModal()">취소</button>

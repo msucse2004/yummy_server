@@ -3,6 +3,15 @@ from decimal import Decimal
 from pydantic import BaseModel, Field
 
 
+class ItemSummary(BaseModel):
+    """품목 요약 - 스탑 주문 품목 표시용"""
+    id: int
+    code: str
+    product: str
+
+    model_config = {"from_attributes": True}
+
+
 class StopOrderItemBase(BaseModel):
     item_id: int
     quantity: Decimal = Field(default=1, gt=0)
@@ -32,6 +41,7 @@ class StopUpdate(BaseModel):
 class StopOrderItemResponse(StopOrderItemBase):
     id: int
     stop_id: int
+    item: ItemSummary | None = None
 
     model_config = {"from_attributes": True}
 

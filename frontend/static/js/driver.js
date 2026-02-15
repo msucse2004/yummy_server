@@ -62,7 +62,7 @@ async function loadStops(routeId, planId) {
   document.getElementById('stopsList').innerHTML = stops.map(s => `
     <div class="card" id="stop-${s.id}">
       <h3>#${s.sequence} ${s.customer?.name || '거래처'}</h3>
-      <p>${(s.order_items || []).map(oi => `${oi.item?.name || ''} x${oi.quantity}`).join(', ') || '-'}</p>
+      <p>${(s.order_items || []).map(oi => `${oi.item?.product || ''} x${oi.quantity}`).join(', ') || '-'}</p>
       <p>${s.is_completed ? '<span style="color:green">완료됨</span>' : `
         <button class="btn btn-primary" onclick="completeStop(${s.id})">완료 처리</button>
       `}</p>

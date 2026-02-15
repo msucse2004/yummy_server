@@ -6,6 +6,7 @@ from app.models.plan import Plan
 from app.models.route import Route, RouteAssignment
 from app.models.stop import Stop, StopOrderItem
 from app.models.completion import StopCompletion, Photo
+from app.models.app_setting import AppSetting
 
 __all__ = [
     "User",
@@ -19,4 +20,5 @@ __all__ = [
     "StopOrderItem",
     "StopCompletion",
     "Photo",
+    "AppSetting",
 ]

@@ -22,8 +22,10 @@ from app.models import (
     StopOrderItem,
     User,
 )
+from app.config import get_settings
 from app.models.user import Role
 from app.schemas.customer import CustomerCreate, CustomerUpdate, CustomerResponse
+from app.services.geocode import maybe_geocode_and_update
 
 
 class DeleteAllRequest(BaseModel):
@@ -32,7 +34,17 @@ class DeleteAllRequest(BaseModel):
 router = APIRouter(prefix="/api/customers", tags=["customers"])
 RequireAdmin = Depends(require_role(Role.ADMIN))
 
-EXCEL_HEADERS = ["코드", "루트", "이름", "연락처", "계약", "주소"]
+EXCEL_HEADERS = ["코드", "루트", "이름", "연락처", "계약", "주소", "위도", "경도"]
+
+
+def _parse_float(val: object) -> float | None:
+    """Parse float from cell value, return None if invalid"""
+    if val is None or str(val).strip() == "":
+        return None
+    try:
+        return float(str(val).strip())
+    except (ValueError, TypeError):
+        return None
 
 
 def _generate_customer_code(db: Session, exclude: set[str] | None = None) -> str:
@@ -71,6 +83,16 @@ def create_customer(
         existing = db.execute(select(Customer).where(Customer.code == data.code)).scalar_one_or_none()
         if existing:
             raise HTTPException(status_code=400, detail="거래처 코드가 이미 존재합니다")
+    settings = get_settings()
+    lat, lon = maybe_geocode_and_update(
+        dump.get("address"),
+        dump.get("latitude"),
+        dump.get("longitude"),
+        api_key=settings.kakao_rest_api_key,
+    )
+    if lat is not None and lon is not None:
+        dump["latitude"] = lat
+        dump["longitude"] = lon
     customer = Customer(**dump)
     db.add(customer)
     db.commit()
@@ -99,6 +121,8 @@ def export_customers_excel(
             c.phone or "",
             c.contract or "",
             c.address or "",
+            float(c.latitude) if c.latitude is not None else "",
+            float(c.longitude) if c.longitude is not None else "",
         ])
     buf = io.BytesIO()
     wb.save(buf)
@@ -140,6 +164,8 @@ def import_customers_excel(
             phone = str(row[3]).strip() if len(row) > 3 and row[3] is not None else None
             contract_val = str(row[4]).strip() if len(row) > 4 and row[4] is not None else None
             address = str(row[5]).strip() if len(row) > 5 and row[5] is not None else None
+            latitude = _parse_float(row[6]) if len(row) > 6 else None
+            longitude = _parse_float(row[7]) if len(row) > 7 else None
             if contract_val and contract_val not in ("계약", "해지"):
                 errors.append(f"{i + 2}행: 계약은 '계약' 또는 '해지'만 가능합니다")
                 continue
@@ -168,13 +194,39 @@ def import_customers_excel(
                 existing.phone = phone or existing.phone
                 existing.contract = contract or existing.contract
                 existing.address = address or existing.address
+                if latitude is not None:
+                    existing.latitude = latitude
+                if longitude is not None:
+                    existing.longitude = longitude
+                need_geocode = (address or existing.address) and latitude is None and longitude is None
+                if need_geocode:
+                    _settings = get_settings()
+                    geocode_addr = address if address else existing.address
+                    lat, lon = maybe_geocode_and_update(
+                        geocode_addr,
+                        None,
+                        None,
+                        api_key=_settings.kakao_rest_api_key,
+                    )
+                    if lat is not None and lon is not None:
+                        existing.latitude = lat
+                        existing.longitude = lon
                 updated += 1
                 continue
             code = code_val if code_val else _generate_customer_code(db, exclude=used_codes)
             if not code_val:
                 used_codes.add(code)
+            if address and latitude is None and longitude is None:
+                _settings = get_settings()
+                lat, lon = maybe_geocode_and_update(
+                    address, None, None, api_key=_settings.kakao_rest_api_key
+                )
+                if lat is not None and lon is not None:
+                    latitude, longitude = lat, lon
             customer = Customer(
                 code=code,
+                latitude=latitude,
+                longitude=longitude,
                 route=route or None,
                 name=name,
                 phone=phone or None,
@@ -255,6 +307,17 @@ def update_customer(
     for k, v in data.model_dump(exclude_unset=True).items():
         if k not in ("name", "code"):
             setattr(customer, k, v)
+    if customer.address and (customer.latitude is None or customer.longitude is None):
+        settings = get_settings()
+        lat, lon = maybe_geocode_and_update(
+            customer.address,
+            customer.latitude,
+            customer.longitude,
+            api_key=settings.kakao_rest_api_key,
+        )
+        if lat is not None and lon is not None:
+            customer.latitude = lat
+            customer.longitude = lon
     db.commit()
     db.refresh(customer)
     return customer

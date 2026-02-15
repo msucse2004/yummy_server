@@ -14,6 +14,7 @@ class Plan(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     plan_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    route: Mapped[str | None] = mapped_column(String(32), nullable=True)
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     memo: Mapped[str | None] = mapped_column(String(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

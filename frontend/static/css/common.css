@@ -129,6 +129,12 @@ table {
 
 th, td { padding: 0.75rem 1rem; text-align: left; }
 th { background: var(--accent); font-weight: 600; }
+th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+th.sortable:hover { opacity: 0.9; }
+th .sort-icon { font-size: 0.6em; margin-left: 0.2em; opacity: 0.6; }
+th.sort-asc .sort-icon::before { content: "▲"; }
+th.sort-desc .sort-icon::before { content: "▼"; }
+th.sort-asc .sort-icon, th.sort-desc .sort-icon { opacity: 1; }
 tr:nth-child(even) { background: rgba(255,255,255,0.02); }
 
 /* Buttons */
@@ -172,6 +178,12 @@ tr:nth-child(even) { background: rgba(255,255,255,0.02); }
   color: #000;
   background: #fff;
 }
+
+.form-inline { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 1rem; }
+.form-inline .form-group { margin-bottom: 0; }
+.form-inline .form-group input { width: auto; min-width: 4rem; }
+.form-inline .form-group label { margin-bottom: 0.25rem; }
+.form-inline .form-group label + input { margin-left: 0; }
 
 /* Nav tabs */
 .nav-tabs {

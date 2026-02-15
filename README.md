@@ -52,6 +52,12 @@ docker compose exec backend python scripts/init_db.py
    - 정적 파일: `frontend/static/` 을 http-server 등으로 서빙
    - 또는 nginx로 `/api` 프록시 설정 후 `frontend/static` 서빙
 
+## 환경 변수 (Docker)
+
+| 변수 | 설명 | 예시 |
+|------|------|------|
+| KAKAO_REST_API_KEY | Kakao 지도 Geocoding API 키. 거래처 주소→위도/경도 변환에 사용. [발급](https://developers.kakao.com/console/app) | (REST API 키) |
+
 ## 외부 접속 (Cloudflare Tunnel)
 
 서버는 외부에 포트를 열지 않아도 됩니다. Cloudflare Tunnel을 사용할 경우:

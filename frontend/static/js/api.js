@@ -84,5 +84,14 @@ const api = {
       }).then(r => r.json());
     },
   },
-  users: { list: () => fetchApi('/users') },
+  settings: {
+    get: () => fetchApi('/settings'),
+    update: (d) => fetchApi('/settings', { method: 'PATCH', body: JSON.stringify(d) }),
+  },
+  users: {
+    list: () => fetchApi('/users'),
+    create: (d) => fetchApi('/users', { method: 'POST', body: JSON.stringify(d) }),
+    update: (id, d) => fetchApi(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(d) }),
+    delete: (id) => fetch(API_BASE + `/users/${id}`, { method: 'DELETE', credentials: 'include' }),
+  },
 };

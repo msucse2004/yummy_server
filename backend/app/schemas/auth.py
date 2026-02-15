@@ -12,6 +12,10 @@ class UserResponse(BaseModel):
     username: str
     role: str
     display_name: str | None
+    ssn: str | None = None
+    phone: str | None = None
+    resume: str | None = None
+    status: str | None = None
 
     @field_validator("role", mode="before")
     @classmethod

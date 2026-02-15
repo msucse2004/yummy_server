@@ -2,6 +2,7 @@
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
@@ -15,6 +16,7 @@ class Settings(BaseSettings):
     session_cookie_name: str = "yummy_session"
     session_max_age_seconds: int = 86400 * 7  # 7일
     cookie_secure: bool = False  # Cloudflare Tunnel HTTPS 시 True로 설정
+    kakao_rest_api_key: str = Field(default="", description="Kakao 지도 Geocoding API 키")
 
     model_config = {"env_prefix": ""}
 
