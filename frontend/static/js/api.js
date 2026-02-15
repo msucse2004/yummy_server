@@ -53,7 +53,16 @@ const api = {
       return fetchApi(url);
     },
     create: (d) => fetchApi('/plans', { method: 'POST', body: JSON.stringify(d) }),
+    createFromList: (d) => fetchApi('/plans/create-from-list', { method: 'POST', body: JSON.stringify(d) }),
+    getNewPlanDefaults: () => fetchApi('/plans/new-plan-defaults'),
     get: (id) => fetchApi(`/plans/${id}`),
+    getPlanDetail: (id) => fetchApi(`/plans/${id}/plan-detail`),
+    getEditData: (id) => fetchApi(`/plans/${id}/edit-data`),
+    updateFromList: (id, d) => fetchApi(`/plans/${id}/update-from-list`, { method: 'PUT', body: JSON.stringify(d) }),
+    update: (id, d) => fetchApi(`/plans/${id}`, { method: 'PATCH', body: JSON.stringify(d) }),
+    delete: (id) => fetch(API_BASE + `/plans/${id}`, { method: 'DELETE', credentials: 'include' }).then(r => {
+      if (!r.ok) return r.json().then(d => { throw { detail: d.detail || r.statusText }; });
+    }),
   },
   routes: {
     listByPlan: (planId) => fetchApi(`/routes/plan/${planId}`),
@@ -63,10 +72,23 @@ const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ driver_id: driverId }),
     }),
+    setAssign: (routeId, driverId) => fetch(API_BASE + `/routes/${routeId}/assign`, {
+      method: 'PUT', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ driver_id: driverId ?? null }),
+    }).then(r => {
+      if (!r.ok) return r.json().then(d => { throw { detail: d.detail || r.statusText }; });
+    }),
   },
   stops: {
     listByRoute: (routeId) => fetchApi(`/stops/route/${routeId}`),
+    getReceipt: (stopId) => fetchApi(`/stops/${stopId}/receipt`),
     create: (routeId, d) => fetchApi(`/stops/route/${routeId}`, { method: 'POST', body: JSON.stringify(d) }),
+    reorder: (routeId, stopIds) => fetch(API_BASE + `/stops/route/${routeId}/reorder`, {
+      method: 'PUT', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stop_ids: stopIds }),
+    }).then(r => { if (!r.ok) return r.json().then(d => { throw { detail: d.detail || r.statusText }; }); }),
   },
   completions: {
     complete: (stopId, memo) => {
@@ -86,6 +108,8 @@ const api = {
   },
   settings: {
     get: () => fetchApi('/settings'),
+    getCompanyLocation: () => fetchApi('/settings/company-location'),
+    geocodeAddress: (addr) => fetchApi('/settings/geocode?' + new URLSearchParams({ address: addr || '' })),
     update: (d) => fetchApi('/settings', { method: 'PATCH', body: JSON.stringify(d) }),
   },
   users: {

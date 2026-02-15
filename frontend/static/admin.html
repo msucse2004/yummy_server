@@ -3,19 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>(주) 맛나 콩나물 - 관리자</title>
+  <title>(주) 맛나 - 관리자</title>
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 </head>
 <body>
   <div class="app-shell">
     <header class="app-header">
-      <h1>(주) 맛나 콩나물 관리자</h1>
+      <h1>(주) 맛나 관리자</h1>
       <button class="logout" onclick="doLogout()">로그아웃</button>
     </header>
     <main class="app-content">
       <nav class="nav-tabs">
-        <a href="#" class="active" data-tab="plans">플랜</a>
+        <a href="#" class="active" data-tab="plans">배송 플랜</a>
         <a href="#" data-tab="customers">거래처</a>
         <a href="#" data-tab="items">품목</a>
         <a href="#" data-tab="users">사용자</a>
@@ -24,33 +25,35 @@
       </nav>
 
       <div id="tab-plans" class="tab-content">
-        <div class="card">
-          <h2>플랜 목록</h2>
-          <p><button class="btn btn-primary" onclick="showPlanForm()">+ 새 플랜</button></p>
-          <table><thead><tr><th>루트</th><th>이름</th><th></th></tr></thead><tbody id="plansList"></tbody></table>
+        <div id="planListPanel">
+          <div class="card">
+            <h2>플랜 목록</h2>
+            <p><button class="btn btn-primary" onclick="showPlanForm()">+ 새 플랜</button></p>
+            <table><thead><tr>
+              <th class="sortable" data-sort="plan_date">날짜 <span class="sort-icon"></span></th>
+              <th>배달 수량</th>
+              <th class="sortable" data-sort="daily_sales">일일매출 <span class="sort-icon"></span></th>
+              <th></th>
+            </tr></thead><tbody id="plansList"></tbody></table>
+          </div>
+          <div id="planDetail" style="display:none"></div>
         </div>
-        <div id="planDetail" style="display:none"></div>
-      </div>
-
-      <div id="planModal" class="modal-overlay" style="display:none" onclick="if(event.target===this) closePlanModal()">
-        <div class="modal-box" onclick="event.stopPropagation()">
-          <h3>새 플랜</h3>
-          <form id="planForm">
-            <div class="form-group">
-              <label for="planRoute">루트 *</label>
-              <select id="planRoute" required>
-                <option value="">선택</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="planName">이름 *</label>
-              <input type="text" id="planName" required placeholder="플랜 이름">
-            </div>
-            <div class="modal-actions">
-              <button type="button" class="btn btn-secondary" onclick="closePlanModal()">취소</button>
-              <button type="submit" class="btn btn-primary">저장</button>
-            </div>
-          </form>
+        <div id="newPlanFullScreen" class="new-plan-fullscreen" style="display:none">
+          <div class="new-plan-content">
+            <h2 id="newPlanTitle">2026년 2월 16일 배달 플랜</h2>
+            <p class="new-plan-date-row">
+              <label for="newPlanDate">배달 날짜</label>
+              <input type="date" id="newPlanDate" onchange="updateNewPlanTitleFromDate()">
+            </p>
+            <p class="new-plan-actions">
+              <button type="button" class="btn btn-secondary" onclick="closeNewPlanForm()">취소</button>
+              <button type="button" class="btn btn-primary" onclick="saveNewPlanFromList()">저장</button>
+            </p>
+            <table class="new-plan-table">
+              <thead><tr><th>코드</th><th>루트</th><th>이름</th><th>배달 항목</th></tr></thead>
+              <tbody id="newPlanTableBody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -69,12 +72,15 @@
           <table><thead><tr>
   <th class="sortable" data-sort="code">코드 <span class="sort-icon"></span></th>
   <th class="sortable" data-sort="route">루트 <span class="sort-icon"></span></th>
-  <th class="sortable" data-sort="name">이름 <span class="sort-icon"></span></th>
-  <th class="sortable" data-sort="phone">연락처 <span class="sort-icon"></span></th>
+  <th class="sortable" data-sort="name">상호 <span class="sort-icon"></span></th>
+  <th class="sortable" data-sort="business_registration_number">사업자번호 <span class="sort-icon"></span></th>
+  <th class="sortable" data-sort="representative_name">대표 <span class="sort-icon"></span></th>
   <th class="sortable" data-sort="contract">계약 <span class="sort-icon"></span></th>
+  <th class="sortable" data-sort="business_type">업태 <span class="sort-icon"></span></th>
+  <th class="sortable" data-sort="business_category">종목 <span class="sort-icon"></span></th>
+  <th class="sortable" data-sort="arrears">미수금액 <span class="sort-icon"></span></th>
+  <th class="sortable" data-sort="contract_content">계약내용 <span class="sort-icon"></span></th>
   <th class="sortable" data-sort="address">주소 <span class="sort-icon"></span></th>
-  <th class="sortable" data-sort="latitude">위도 <span class="sort-icon"></span></th>
-  <th class="sortable" data-sort="longitude">경도 <span class="sort-icon"></span></th>
   <th></th>
 </tr></thead><tbody id="customersList"></tbody></table>
         </div>
@@ -91,7 +97,7 @@
               <input type="file" id="itemExcelInput" accept=".xlsx" style="display:none" onchange="importItemsExcel(event)">
             </label>
           </p>
-          <table><thead><tr><th>코드</th><th>상품</th><th>무게</th><th>단위</th><th>단가 (원)</th><th></th></tr></thead><tbody id="itemsList"></tbody></table>
+          <table><thead><tr><th>코드</th><th>상품</th><th>단위</th><th>단가 (원)</th><th>설명</th><th></th></tr></thead><tbody id="itemsList"></tbody></table>
         </div>
       </div>
 
@@ -183,12 +189,43 @@
               <input type="text" id="settingCompanyName" placeholder="회사 이름">
             </div>
             <div class="form-group">
+              <label for="settingBusinessRegNum">사업자 등록 번호</label>
+              <input type="text" id="settingBusinessRegNum" placeholder="000-00-00000">
+            </div>
+            <div class="form-group">
+              <label for="settingRepresentativeName">대표이름</label>
+              <input type="text" id="settingRepresentativeName" placeholder="대표자명">
+            </div>
+            <div class="form-group">
               <label for="settingCompanyAddress">회사 주소</label>
-              <input type="text" id="settingCompanyAddress" placeholder="회사 주소">
+              <div class="address-input-wrap">
+                <input type="text" id="settingCompanyAddress" placeholder="회사 주소">
+                <span id="settingAddressStatus" class="address-status" title="주소를 입력 후 변경 시 위도/경도 검증"></span>
+              </div>
             </div>
             <div class="form-group">
               <label for="settingCompanyPhone">회사 전화번호</label>
               <input type="text" id="settingCompanyPhone" placeholder="회사 전화번호">
+            </div>
+            <div class="form-group">
+              <label for="settingBusinessType">업태</label>
+              <input type="text" id="settingBusinessType" placeholder="업태">
+            </div>
+            <div class="form-group">
+              <label for="settingBusinessCategory">종목</label>
+              <input type="text" id="settingBusinessCategory" placeholder="종목">
+            </div>
+            <div class="form-group">
+              <label for="settingBankName">은행명</label>
+              <input type="text" id="settingBankName" placeholder="예: KB국민은행">
+            </div>
+            <div class="form-group">
+              <label for="settingBankAccount">계좌번호</label>
+              <input type="text" id="settingBankAccount" placeholder="예: 796801-00-111509">
+            </div>
+            <div class="form-group">
+              <label for="settingBankHolder">예금주</label>
+              <input type="text" id="settingBankHolder" placeholder="예금주명">
             </div>
             <div class="form-group">
               <label for="settingDeliveryRouteCount">배달 루트</label>
@@ -213,19 +250,44 @@
           <input type="text" id="itemProduct" required placeholder="상품명">
         </div>
         <div class="form-group">
-          <label for="itemWeight">무게</label>
-          <input type="number" id="itemWeight" placeholder="무게" step="any" min="0">
-        </div>
-        <div class="form-group">
           <label for="itemUnit">단위</label>
-          <input type="text" id="itemUnit" placeholder="단위 (예: EA, kg)" value="EA">
+          <select id="itemUnit">
+            <option value="박스">박스</option>
+            <option value="판">판</option>
+            <option value="관">관</option>
+          </select>
         </div>
         <div class="form-group">
           <label for="itemUnitPrice">단가 (원)</label>
           <input type="number" id="itemUnitPrice" placeholder="원" step="1" min="0">
         </div>
+        <div class="form-group">
+          <label for="itemDescription">설명</label>
+          <input type="text" id="itemDescription" placeholder="설명">
+        </div>
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" onclick="closeItemModal()">취소</button>
+          <button type="submit" class="btn btn-primary">저장</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="planModal" class="modal-overlay" style="display:none" onclick="if(event.target===this) closePlanModal()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <h3>플랜 수정</h3>
+      <form id="planForm">
+        <input type="hidden" id="planId" value="">
+        <div class="form-group">
+          <label for="planDate">배달 날짜 *</label>
+          <input type="date" id="planDate" required>
+        </div>
+        <div class="form-group">
+          <label for="planName">플랜 이름 *</label>
+          <input type="text" id="planName" required placeholder="예: 2026-02-16 배달">
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="closePlanModal()">취소</button>
           <button type="submit" class="btn btn-primary">저장</button>
         </div>
       </form>
@@ -243,11 +305,21 @@
         </div>
         <div class="form-group">
           <label for="customerRoute">루트</label>
-          <input type="text" id="customerRoute" placeholder="루트 (선택)">
+          <select id="customerRoute">
+            <option value="">선택</option>
+          </select>
         </div>
         <div class="form-group">
           <label for="customerName">이름 *</label>
           <input type="text" id="customerName" required placeholder="거래처 이름">
+        </div>
+        <div class="form-group">
+          <label for="customerBusinessRegNum">사업자번호</label>
+          <input type="text" id="customerBusinessRegNum" placeholder="000-00-00000">
+        </div>
+        <div class="form-group">
+          <label for="customerRepresentative">대표</label>
+          <input type="text" id="customerRepresentative" placeholder="대표자명">
         </div>
         <div class="form-group">
           <label for="customerPhone">연락처</label>
@@ -260,6 +332,34 @@
             <option value="계약">계약</option>
             <option value="해지">해지</option>
           </select>
+        </div>
+        <div class="form-group">
+          <label>계약 내용</label>
+          <div class="contract-input-mode">
+            <label><input type="radio" name="contractInputMode" value="select" checked> 품목 선택</label>
+            <label><input type="radio" name="contractInputMode" value="text"> 텍스트 입력</label>
+          </div>
+          <div id="contractContentSelectMode" class="contract-mode-panel">
+            <div id="contractContentItems"></div>
+            <p><button type="button" class="btn btn-secondary" onclick="addContractItemRow()">+ 품목 추가</button></p>
+          </div>
+          <div id="contractContentTextMode" class="contract-mode-panel" style="display:none">
+            <textarea id="customerContractContentText" rows="3" placeholder="예: 곱슬이 2박스, 일자 3박스, 두부 3판, 도토리묵 5판"></textarea>
+            <p><button type="button" class="btn btn-secondary" onclick="matchContractContent()">맵핑 확인</button>
+            <span id="contractMatchResult" class="contract-match-result"></span></p>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="customerBusinessType">업태</label>
+          <input type="text" id="customerBusinessType" placeholder="업태">
+        </div>
+        <div class="form-group">
+          <label for="customerBusinessCategory">종목</label>
+          <input type="text" id="customerBusinessCategory" placeholder="종목">
+        </div>
+        <div class="form-group">
+          <label for="customerArrears">미수금액 (원)</label>
+          <input type="number" id="customerArrears" placeholder="0" min="0" step="1">
         </div>
         <div class="form-group">
           <label for="customerAddress">주소</label>
@@ -281,6 +381,7 @@
     </div>
   </div>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="/js/api.js"></script>
   <script src="/js/admin.js?v=2"></script>
 </body>

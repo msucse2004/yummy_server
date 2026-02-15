@@ -1,20 +1,47 @@
 """플랜 CRUD - ADMIN 생성/수정, DRIVER는 배정된 플랜만 조회"""
-from datetime import date
+from collections import defaultdict
+from datetime import date, timedelta
+from decimal import Decimal
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.auth import require_user, require_role
 from app.database import get_db
-from app.models import User, Plan, Route, RouteAssignment
+from app.models import User, Plan, Route, RouteAssignment, Stop, StopOrderItem, Item, Customer
 from app.models.user import Role
-from app.schemas.plan import PlanCreate, PlanUpdate, PlanResponse
+from app.schemas.plan import PlanCreate, PlanListResponse, PlanUpdate, PlanResponse
+from app.services.contract_match import contract_items_to_display_string, match_contract_content
 
 router = APIRouter(prefix="/api/plans", tags=["plans"])
 RequireAdmin = Depends(require_role(Role.ADMIN))
 
 
-@router.get("", response_model=list[PlanResponse])
+def _get_plan_delivery_summary(db: Session, plan_id: int) -> tuple[str, int]:
+    """플랜의 배달 수량(곱슬이 10박스, ...), 일일매출(원) 반환"""
+    stmt = (
+        select(Item.product, Item.unit, StopOrderItem.quantity, Item.unit_price)
+        .select_from(StopOrderItem)
+        .join(Item, StopOrderItem.item_id == Item.id)
+        .join(Stop, StopOrderItem.stop_id == Stop.id)
+        .join(Route, Stop.route_id == Route.id)
+        .where(Route.plan_id == plan_id)
+    )
+    rows = db.execute(stmt).all()
+    agg: dict[tuple[str, str], float] = defaultdict(float)
+    daily_sales = 0
+    for product, unit, qty, price in rows:
+        key = (product or "", unit or "박스")
+        agg[key] += float(qty)
+        if price is not None:
+            daily_sales += int(float(qty) * float(price))
+    parts = [f"{p} {int(q) if q == int(q) else q}{u}" for (p, u), q in sorted(agg.items())]
+    return ", ".join(parts), daily_sales
+
+
+@router.get("", response_model=list[PlanListResponse])
 def list_plans(
     from_date: date | None = Query(None),
     to_date: date | None = Query(None),
@@ -30,7 +57,22 @@ def list_plans(
         stmt = stmt.join(Plan.routes).join(Route.assignments).where(
             RouteAssignment.driver_id == current_user.id
         )
-    return list(db.execute(stmt).scalars().unique().all())
+    plans = list(db.execute(stmt).scalars().unique().all())
+    result = []
+    for p in plans:
+        delivery_qty, daily_sales = _get_plan_delivery_summary(db, p.id)
+        result.append(
+            PlanListResponse(
+                id=p.id,
+                plan_date=p.plan_date,
+                route=p.route,
+                name=p.name,
+                memo=p.memo,
+                delivery_quantity=delivery_qty,
+                daily_sales=daily_sales,
+            )
+        )
+    return result
 
 
 @router.post("", response_model=PlanResponse, status_code=status.HTTP_201_CREATED)
@@ -45,6 +87,311 @@ def create_plan(
     db.commit()
     db.refresh(plan)
     return plan
+
+
+class NewPlanCustomerRow(BaseModel):
+    customer_id: int
+    code: str
+    route: str
+    name: str
+    delivery_items: str = ""
+
+
+class CreatePlanFromListRequest(BaseModel):
+    plan_date: date
+    rows: list[NewPlanCustomerRow] = Field(..., min_length=1)
+
+
+@router.get("/new-plan-defaults")
+def get_new_plan_defaults(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+    _: User = RequireAdmin,
+):
+    """새 플랜 폼 기본값: 내일 날짜, 거래처 목록(배달 항목은 최근 플랜 또는 계약내용)"""
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    customers = list(db.execute(select(Customer).order_by(Customer.route, Customer.name)).scalars().all())
+    latest_stmt = (
+        select(Plan)
+        .order_by(Plan.plan_date.desc())
+        .limit(1)
+        .options(
+            joinedload(Plan.routes).joinedload(Route.stops).joinedload(Stop.order_items).joinedload(StopOrderItem.item),
+        )
+    )
+    latest_plan = db.execute(latest_stmt).scalars().unique().first()
+    customer_delivery: dict[int, str] = {}
+    if latest_plan:
+        for route in latest_plan.routes:
+            for stop in route.stops:
+                items = []
+                for oi in stop.order_items:
+                    if oi.item:
+                        q = float(oi.quantity)
+                        items.append(
+                            f"{oi.item.product} {int(q) if q == int(q) else q}{oi.item.unit}"
+                        )
+                if items:
+                    customer_delivery[stop.customer_id] = ", ".join(items)
+    rows = []
+    for c in customers:
+        delivery = customer_delivery.get(c.id) or c.contract_content or ""
+        rows.append(
+            NewPlanCustomerRow(
+                customer_id=c.id,
+                code=c.code or "",
+                route=c.route or "",
+                name=c.name or "",
+                delivery_items=delivery,
+            )
+        )
+    return {"plan_date": tomorrow, "rows": rows}
+
+
+@router.get("/{plan_id}/edit-data")
+def get_plan_edit_data(
+    plan_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+    _: User = RequireAdmin,
+):
+    """플랜 수정용 데이터 - 새플랜 폼과 동일 형식"""
+    plan = db.get(
+        Plan,
+        plan_id,
+        options=[
+            joinedload(Plan.routes).joinedload(Route.stops).joinedload(Stop.order_items).joinedload(StopOrderItem.item),
+            joinedload(Plan.routes).joinedload(Route.stops).joinedload(Stop.customer),
+        ],
+    )
+    if not plan:
+        raise HTTPException(status_code=404, detail="플랜을 찾을 수 없습니다")
+    rows = []
+    for route in sorted(plan.routes, key=lambda r: (r.sequence, r.id)):
+        for stop in sorted(route.stops, key=lambda s: (s.sequence, s.id)):
+            items = []
+            for oi in stop.order_items:
+                if oi.item:
+                    q = float(oi.quantity)
+                    items.append(
+                        f"{oi.item.product} {int(q) if q == int(q) else q}{oi.item.unit}"
+                    )
+            rows.append(
+                NewPlanCustomerRow(
+                    customer_id=stop.customer_id,
+                    code=stop.customer.code or "",
+                    route=route.name,
+                    name=stop.customer.name or "",
+                    delivery_items=", ".join(items),
+                )
+            )
+    return {"plan_date": plan.plan_date.isoformat(), "rows": rows, "plan_id": plan_id}
+
+
+@router.put("/{plan_id}/update-from-list", response_model=PlanResponse)
+def update_plan_from_list(
+    plan_id: int,
+    data: CreatePlanFromListRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+    _: User = RequireAdmin,
+):
+    """거래처 목록 기반으로 플랜 업데이트 (기존 루트/스탑 삭제 후 재생성)"""
+    plan = db.get(Plan, plan_id)
+    if not plan:
+        raise HTTPException(status_code=404, detail="플랜을 찾을 수 없습니다")
+    if data.plan_date != plan.plan_date:
+        existing = (
+            db.execute(select(Plan).where(Plan.plan_date == data.plan_date, Plan.id != plan_id))
+            .scalars()
+            .first()
+        )
+        if existing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"해당 날짜({data.plan_date})에 이미 배송 플랜이 있습니다. 다른 날짜를 선택하세요.",
+            )
+    for route in list(plan.routes):
+        db.delete(route)
+    db.flush()
+    plan.plan_date = data.plan_date
+    plan.name = f"{data.plan_date} 배달"
+    by_route: dict[str, list[NewPlanCustomerRow]] = defaultdict(list)
+    for r in data.rows:
+        rt = r.route.strip() or "기타"
+        by_route[rt].append(r)
+    for seq, (route_name, rows) in enumerate(sorted(by_route.items())):
+        route = Route(plan_id=plan.id, name=route_name, sequence=seq)
+        db.add(route)
+        db.flush()
+        for sidx, row in enumerate(rows):
+            matches = match_contract_content(row.delivery_items, db)
+            order_items_data = [
+                {"item_id": m["item_id"], "quantity": Decimal(str(m["quantity"])), "memo": None}
+                for m in matches
+            ]
+            if not order_items_data:
+                order_items_data = []
+            stop = Stop(route_id=route.id, customer_id=row.customer_id, sequence=sidx, memo=None)
+            db.add(stop)
+            db.flush()
+            for oi in order_items_data:
+                db.add(
+                    StopOrderItem(
+                        stop_id=stop.id,
+                        item_id=oi["item_id"],
+                        quantity=oi["quantity"],
+                        memo=oi["memo"],
+                    )
+                )
+    db.commit()
+    db.refresh(plan)
+    return plan
+
+
+@router.post("/create-from-list", response_model=PlanResponse, status_code=status.HTTP_201_CREATED)
+def create_plan_from_list(
+    data: CreatePlanFromListRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+    _: User = RequireAdmin,
+):
+    """거래처 목록 기반으로 플랜 생성 (루트별 Route, Stop, order_items)"""
+    existing = db.execute(select(Plan).where(Plan.plan_date == data.plan_date)).scalars().first()
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"해당 날짜({data.plan_date})에 이미 배송 플랜이 있습니다. 다른 날짜를 선택하세요.",
+        )
+    plan = Plan(
+        plan_date=data.plan_date,
+        route=None,
+        name=f"{data.plan_date} 배달",
+        memo=None,
+    )
+    db.add(plan)
+    db.flush()
+    by_route: dict[str, list[NewPlanCustomerRow]] = defaultdict(list)
+    for r in data.rows:
+        rt = r.route.strip() or "기타"
+        by_route[rt].append(r)
+    for seq, (route_name, rows) in enumerate(sorted(by_route.items())):
+        route = Route(plan_id=plan.id, name=route_name, sequence=seq)
+        db.add(route)
+        db.flush()
+        for sidx, row in enumerate(rows):
+            matches = match_contract_content(row.delivery_items, db)
+            order_items_data = [
+                {"item_id": m["item_id"], "quantity": Decimal(str(m["quantity"])), "memo": None}
+                for m in matches
+            ]
+            if not order_items_data:
+                order_items_data = []
+            stop = Stop(route_id=route.id, customer_id=row.customer_id, sequence=sidx, memo=None)
+            db.add(stop)
+            db.flush()
+            for oi in order_items_data:
+                db.add(
+                    StopOrderItem(
+                        stop_id=stop.id,
+                        item_id=oi["item_id"],
+                        quantity=oi["quantity"],
+                        memo=oi["memo"],
+                    )
+                )
+    db.commit()
+    db.refresh(plan)
+    return plan
+
+
+class RouteWithAssignment(BaseModel):
+    """루트 + 배정 기사 정보 (플랜 상세용)"""
+    id: int
+    plan_id: int
+    name: str
+    sequence: int
+    assignments: list[dict] = []
+    model_config = {"from_attributes": True}
+
+
+class PlanDetailResponse(BaseModel):
+    """플랜 상세 - 루트별 배정 + 이전날 기사 디폴트"""
+    plan: PlanResponse
+    routes: list[RouteWithAssignment]
+    previous_day_drivers: dict[str, dict] = {}
+
+
+@router.get("/{plan_id}/plan-detail", response_model=PlanDetailResponse)
+def get_plan_detail(
+    plan_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """관리자 플랜 상세 - 루트별 기사 배정, 이전날 기사 디폴트 포함"""
+    plan = db.get(
+        Plan,
+        plan_id,
+        options=[
+            joinedload(Plan.routes).joinedload(Route.assignments).joinedload(RouteAssignment.driver),
+        ],
+    )
+    if not plan:
+        raise HTTPException(status_code=404, detail="플랜을 찾을 수 없습니다")
+    if current_user.role == Role.DRIVER:
+        has_access = any(
+            a.driver_id == current_user.id
+            for r in plan.routes
+            for a in r.assignments
+        )
+        if not has_access:
+            raise HTTPException(status_code=403, detail="배정된 플랜이 아닙니다")
+
+    prev_plan = db.execute(
+        select(Plan)
+        .where(Plan.plan_date == plan.plan_date - timedelta(days=1))
+        .order_by(Plan.id.desc())
+        .limit(1)
+    ).scalars().first()
+    previous_day_drivers: dict[str, dict] = {}
+    if prev_plan:
+        prev_plan = db.get(
+            Plan,
+            prev_plan.id,
+            options=[
+                joinedload(Plan.routes).joinedload(Route.assignments).joinedload(RouteAssignment.driver),
+            ],
+        )
+        if prev_plan and hasattr(prev_plan, "routes"):
+            for r in prev_plan.routes:
+                if r.assignments:
+                    a = r.assignments[0]
+                    d = a.driver
+                    previous_day_drivers[r.name] = {
+                        "driver_id": d.id,
+                        "driver_name": (d.display_name or d.username) if d else "",
+                    }
+
+    routes_data = []
+    for r in sorted(plan.routes, key=lambda x: (x.sequence, x.id)):
+        assignments = [
+            {"driver_id": a.driver_id, "driver_name": (a.driver.display_name or a.driver.username) if a.driver else ""}
+            for a in r.assignments
+        ]
+        routes_data.append(
+            RouteWithAssignment(
+                id=r.id,
+                plan_id=r.plan_id,
+                name=r.name,
+                sequence=r.sequence,
+                assignments=assignments,
+            )
+        )
+
+    return PlanDetailResponse(
+        plan=PlanResponse.model_validate(plan),
+        routes=routes_data,
+        previous_day_drivers=previous_day_drivers,
+    )
 
 
 @router.get("/{plan_id}", response_model=PlanResponse)
@@ -78,6 +425,17 @@ def update_plan(
     plan = db.get(Plan, plan_id)
     if not plan:
         raise HTTPException(status_code=404, detail="플랜을 찾을 수 없습니다")
+    if data.plan_date is not None and data.plan_date != plan.plan_date:
+        existing = (
+            db.execute(select(Plan).where(Plan.plan_date == data.plan_date, Plan.id != plan_id))
+            .scalars()
+            .first()
+        )
+        if existing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"해당 날짜({data.plan_date})에 이미 배송 플랜이 있습니다. 다른 날짜를 선택하세요.",
+            )
     for k, v in data.model_dump(exclude_unset=True).items():
         setattr(plan, k, v)
     db.commit()

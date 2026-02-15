@@ -8,6 +8,7 @@ class ItemSummary(BaseModel):
     id: int
     code: str
     product: str
+    unit: str = "박스"
 
     model_config = {"from_attributes": True}
 
@@ -20,6 +21,19 @@ class StopOrderItemBase(BaseModel):
 
 class StopOrderItemCreate(StopOrderItemBase):
     pass
+
+
+class CustomerSummary(BaseModel):
+    id: int
+    name: str
+    latitude: float | None = None
+    longitude: float | None = None
+    model_config = {"from_attributes": True}
+
+
+class PhotoSummary(BaseModel):
+    id: int
+    model_config = {"from_attributes": True}
 
 
 class StopBase(BaseModel):
@@ -46,10 +60,23 @@ class StopOrderItemResponse(StopOrderItemBase):
     model_config = {"from_attributes": True}
 
 
+class CompletionPhotoSummary(BaseModel):
+    id: int
+    model_config = {"from_attributes": True}
+
+
+class CompletionSummary(BaseModel):
+    id: int
+    photos: list[PhotoSummary] = Field(default_factory=list)
+    model_config = {"from_attributes": True}
+
+
 class StopResponse(StopBase):
     id: int
     route_id: int
     order_items: list[StopOrderItemResponse] = Field(default_factory=list)
     is_completed: bool = False
+    customer: CustomerSummary | None = None
+    completions: list[CompletionSummary] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}

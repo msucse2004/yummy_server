@@ -17,7 +17,7 @@ from app.schemas.item import ItemCreate, ItemUpdate, ItemResponse
 router = APIRouter(prefix="/api/items", tags=["items"])
 RequireAdmin = Depends(require_role(Role.ADMIN))
 
-EXCEL_HEADERS = ["코드", "상품", "무게", "단위", "단가"]
+EXCEL_HEADERS = ["코드", "상품", "단위", "단가", "설명"]
 
 
 def _generate_item_code(db: Session) -> str:
@@ -74,9 +74,9 @@ def export_items_excel(
         ws.append([
             i.code or "",
             i.product or "",
-            float(i.weight) if i.weight is not None else "",
-            i.unit or "EA",
-            float(i.unit_price) if i.unit_price is not None else "",
+            i.unit or "박스",
+            int(i.unit_price) if i.unit_price is not None else "",
+            i.description or "",
         ])
     buf = io.BytesIO()
     wb.save(buf)
@@ -113,31 +113,27 @@ def import_items_excel(
                 continue
             code_val = str(row[0]).strip() if row[0] is not None else None
             product_val = str(row[1]).strip() if len(row) > 1 and row[1] is not None else ""
-            # 5열: 코드,상품,무게,단위,단가 / 4열(구형): 코드,상품,단위,단가
+            # 5열: 코드,상품,단위,단가,설명 / 4열(구형): 코드,상품,단위,단가
             if len(row) >= 5:
-                weight_raw = row[2] if len(row) > 2 else None
-                unit_val = str(row[3]).strip() if len(row) > 3 and row[3] is not None else "EA"
-                price_raw = row[4] if len(row) > 4 else None
-            else:
-                weight_raw = None
-                unit_val = str(row[2]).strip() if len(row) > 2 and row[2] is not None else "EA"
+                unit_val = str(row[2]).strip() if len(row) > 2 and row[2] is not None else "박스"
                 price_raw = row[3] if len(row) > 3 else None
+                desc_val = str(row[4]).strip() if len(row) > 4 and row[4] is not None else None
+            else:
+                unit_val = str(row[2]).strip() if len(row) > 2 and row[2] is not None else "박스"
+                price_raw = row[3] if len(row) > 3 else None
+                desc_val = None
+            if unit_val and unit_val not in ("박스", "판", "관"):
+                unit_val = "박스"
+            unit_val = unit_val or "박스"
             if not product_val:
                 errors.append(f"{i + 2}행: 상품명이 없습니다")
                 continue
-            weight = None
-            if weight_raw is not None and str(weight_raw).strip() != "":
-                try:
-                    weight = Decimal(str(weight_raw).strip())
-                except (InvalidOperation, ValueError):
-                    errors.append(f"{i + 2}행: 무게가 숫자가 아닙니다 (무시됨)")
             unit_price = None
             if price_raw is not None and str(price_raw).strip() != "":
                 try:
-                    unit_price = Decimal(str(price_raw).strip())
+                    unit_price = Decimal(int(Decimal(str(price_raw).strip())))
                 except (InvalidOperation, ValueError):
                     errors.append(f"{i + 2}행: 단가가 숫자가 아닙니다 (무시됨)")
-            unit_val = unit_val if unit_val else "EA"
             existing = None
             if code_val:
                 existing = db.execute(
@@ -149,18 +145,19 @@ def import_items_excel(
                 ).scalars().first()
             if existing:
                 existing.product = product_val
-                existing.weight = weight if weight is not None else existing.weight
                 existing.unit = unit_val
                 existing.unit_price = unit_price if unit_price is not None else existing.unit_price
+                if desc_val is not None:
+                    existing.description = desc_val or None
                 updated += 1
             else:
                 code = _generate_item_code(db)
                 item = Item(
                     code=code,
                     product=product_val,
-                    weight=weight,
                     unit=unit_val,
                     unit_price=unit_price,
+                    description=desc_val or None,
                 )
                 db.add(item)
                 created += 1

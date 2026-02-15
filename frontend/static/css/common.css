@@ -148,6 +148,39 @@ tr:nth-child(even) { background: rgba(255,255,255,0.02); }
 
 .btn-primary { background: var(--highlight); color: white; }
 .btn-secondary { background: var(--accent); color: var(--text); }
+.plan-actions .btn { margin-right: 0.5rem; }
+.route-map { border-radius: 8px; overflow: hidden; }
+.route-map-placeholder { color: var(--muted); font-size: 0.9rem; margin: 0.5rem 0; }
+.address-input-wrap { display: flex; align-items: center; gap: 0.5rem; }
+.address-input-wrap input { flex: 1; }
+.address-status { font-size: 1.2rem; min-width: 1.5rem; }
+.address-status.ok { color: #27ae60; }
+.address-status.fail { color: #e74c3c; }
+.addr-status.ok { color: #27ae60; margin-left: 0.25rem; }
+.addr-status.fail { color: #e74c3c; margin-left: 0.25rem; }
+.stop-row-draggable { cursor: grab; }
+.stop-row-draggable.dragging { opacity: 0.5; }
+.stop-row-draggable.drag-over { border-top: 2px solid var(--highlight); }
+.route-marker-number { background: none !important; border: none !important; }
+.route-marker-num-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; background: #4a90d9; color: #fff;
+  font-size: 12px; font-weight: bold; border-radius: 50%;
+  border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+.route-marker-origin { background: none !important; border: none !important; }
+tr.plan-row-clickable { cursor: pointer; }
+
+/* Links - 카드/테이블 내 링크 가독성 */
+.card a,
+table a {
+  color: #60a5fa !important;
+  text-decoration: underline;
+}
+.card a:hover,
+table a:hover {
+  color: #93c5fd !important;
+}
 
 /* Cards */
 .card {
@@ -229,3 +262,39 @@ tr:nth-child(even) { background: rgba(255,255,255,0.02); }
   margin-top: 1rem;
   justify-content: flex-end;
 }
+
+.contract-input-mode { margin-bottom: 0.5rem; }
+.contract-input-mode label { margin-right: 1rem; cursor: pointer; }
+.contract-mode-panel { margin-top: 0.5rem; }
+.contract-item-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.contract-item-row select { flex: 1; min-width: 120px; }
+.contract-match-result { margin-left: 0.5rem; font-size: 0.9em; }
+.contract-match-result.ok { color: #6c0; }
+.contract-match-result.err { color: var(--highlight); }
+
+.new-plan-fullscreen {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 100;
+  overflow-y: auto;
+  padding: 1.5rem;
+}
+.new-plan-content {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.new-plan-content h2 { margin: 0 0 0.5rem; }
+.new-plan-date-row { margin: 0 0 1rem; }
+.new-plan-date-row label { margin-right: 0.5rem; }
+.new-plan-date-row input[type="date"] { padding: 0.35rem; }
+.new-plan-actions { margin-bottom: 1rem; }
+.new-plan-table { width: 100%; }
+.new-plan-table th { text-align: left; padding: 0.5rem; }
+.new-plan-table td { padding: 0.5rem; }
+.new-plan-table input[type="text"] { width: 100%; }

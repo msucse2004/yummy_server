@@ -1,5 +1,6 @@
 """거래처 CRUD - ADMIN 전용"""
 import io
+import re
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -11,6 +12,7 @@ from app.core.auth import require_user, require_role
 from app.core.security import verify_password
 from app.database import get_db
 from app.models import (
+    AppSetting,
     Customer,
     Item,
     Photo,
@@ -25,6 +27,10 @@ from app.models import (
 from app.config import get_settings
 from app.models.user import Role
 from app.schemas.customer import CustomerCreate, CustomerUpdate, CustomerResponse
+from app.services.contract_match import (
+    contract_items_to_display_string,
+    match_contract_content,
+)
 from app.services.geocode import maybe_geocode_and_update
 
 
@@ -34,7 +40,34 @@ class DeleteAllRequest(BaseModel):
 router = APIRouter(prefix="/api/customers", tags=["customers"])
 RequireAdmin = Depends(require_role(Role.ADMIN))
 
-EXCEL_HEADERS = ["코드", "루트", "이름", "연락처", "계약", "주소", "위도", "경도"]
+EXCEL_HEADERS = ["코드", "루트", "이름", "사업자번호", "대표", "계약", "업태", "종목", "미수금액", "계약내용", "주소", "위도", "경도"]
+
+
+def _get_delivery_route_count(db: Session) -> int:
+    """설정의 배달 루트 개수"""
+    row = db.execute(
+        select(AppSetting).where(AppSetting.key == "delivery_route_count")
+    ).scalars().first()
+    if not row:
+        return 5
+    try:
+        return int(row.value)
+    except (ValueError, TypeError):
+        return 5
+
+
+def _normalize_route(route_raw: str | None, max_routes: int) -> str | None:
+    """루트 텍스트를 N호차 형식으로 정규화. "1", "1호" -> "1호차" """
+    if not route_raw or not str(route_raw).strip():
+        return None
+    s = str(route_raw).strip()
+    m = re.match(r"^(\d+)", s)
+    if not m:
+        return s if s.endswith("호차") and s[:-2].isdigit() else None
+    n = int(m.group(1))
+    if 1 <= n <= max_routes:
+        return f"{n}호차"
+    return f"{n}호차" if n > 0 else None
 
 
 def _parse_float(val: object) -> float | None:
@@ -100,6 +133,24 @@ def create_customer(
     return customer
 
 
+class MatchContractRequest(BaseModel):
+    text: str
+
+
+@router.post("/match-contract-content")
+def match_contract_content_api(
+    data: MatchContractRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+    _: User = RequireAdmin,
+):
+    """텍스트 계약 내용을 품목 DB와 ML 유사도 기반으로 맵핑"""
+    text = (data.text or "").strip()
+    matches = match_contract_content(text, db)
+    display_str = contract_items_to_display_string(matches) if matches else ""
+    return {"matches": matches, "display_string": display_str}
+
+
 @router.get("/export/excel")
 def export_customers_excel(
     db: Session = Depends(get_db),
@@ -118,8 +169,13 @@ def export_customers_excel(
             c.code or "",
             c.route or "",
             c.name or "",
-            c.phone or "",
+            c.business_registration_number or "",
+            c.representative_name or "",
             c.contract or "",
+            c.business_type or "",
+            c.business_category or "",
+            int(c.arrears) if c.arrears is not None else "",
+            c.contract_content or "",
             c.address or "",
             float(c.latitude) if c.latitude is not None else "",
             float(c.longitude) if c.longitude is not None else "",
@@ -155,17 +211,57 @@ def import_customers_excel(
         updated = 0
         errors = []
         used_codes: set[str] = set()
+        max_routes = _get_delivery_route_count(db)
         for i, row in enumerate(rows):
             if not row or all(cell is None or str(cell).strip() == "" for cell in row):
                 continue
             code_val = str(row[0]).strip() if row[0] is not None else None
-            route = str(row[1]).strip() if len(row) > 1 and row[1] is not None else None
+            route_raw = str(row[1]).strip() if len(row) > 1 and row[1] is not None else None
+            route = _normalize_route(route_raw, max_routes) if route_raw else None
             name = str(row[2]).strip() if len(row) > 2 and row[2] is not None else ""
-            phone = str(row[3]).strip() if len(row) > 3 and row[3] is not None else None
-            contract_val = str(row[4]).strip() if len(row) > 4 and row[4] is not None else None
-            address = str(row[5]).strip() if len(row) > 5 and row[5] is not None else None
-            latitude = _parse_float(row[6]) if len(row) > 6 else None
-            longitude = _parse_float(row[7]) if len(row) > 7 else None
+            # 13열(신규): 코드,루트,이름,사업자번호,대표,계약,업태,종목,미수금액,계약내용,주소,위도,경도
+            # 12열(구): 코드,루트,이름,사업자번호,대표,계약,업태,종목,계약내용,주소,위도,경도
+            # 9열(구형): 코드,루트,이름,연락처,계약,계약내용,주소,위도,경도
+            arrears_val = None
+            if len(row) >= 13:
+                business_registration_number = str(row[3]).strip() if row[3] is not None else None
+                representative_name = str(row[4]).strip() if row[4] is not None else None
+                contract_val = str(row[5]).strip() if row[5] is not None else None
+                business_type = str(row[6]).strip() if row[6] is not None else None
+                business_category = str(row[7]).strip() if row[7] is not None else None
+                arrears_val = _parse_float(row[8])
+                contract_content_raw = str(row[9]).strip() if row[9] is not None else None
+                address = str(row[10]).strip() if row[10] is not None else None
+                latitude = _parse_float(row[11])
+                longitude = _parse_float(row[12])
+                phone = None
+            elif len(row) >= 12:
+                business_registration_number = str(row[3]).strip() if row[3] is not None else None
+                representative_name = str(row[4]).strip() if row[4] is not None else None
+                contract_val = str(row[5]).strip() if row[5] is not None else None
+                business_type = str(row[6]).strip() if row[6] is not None else None
+                business_category = str(row[7]).strip() if row[7] is not None else None
+                contract_content_raw = str(row[8]).strip() if row[8] is not None else None
+                address = str(row[9]).strip() if row[9] is not None else None
+                latitude = _parse_float(row[10])
+                longitude = _parse_float(row[11])
+                phone = None
+            elif len(row) >= 9:
+                business_registration_number = None
+                representative_name = None
+                business_type = None
+                business_category = None
+                phone = str(row[3]).strip() if len(row) > 3 and row[3] is not None else None
+                contract_val = str(row[4]).strip() if len(row) > 4 and row[4] is not None else None
+                contract_content_raw = str(row[5]).strip() if len(row) > 5 and row[5] is not None else None
+                address = str(row[6]).strip() if len(row) > 6 and row[6] is not None else None
+                latitude = _parse_float(row[7]) if len(row) > 7 else None
+                longitude = _parse_float(row[8]) if len(row) > 8 else None
+            if contract_content_raw:
+                matches = match_contract_content(contract_content_raw, db)
+                contract_content = contract_items_to_display_string(matches) if matches else contract_content_raw
+            else:
+                contract_content = None
             if contract_val and contract_val not in ("계약", "해지"):
                 errors.append(f"{i + 2}행: 계약은 '계약' 또는 '해지'만 가능합니다")
                 continue
@@ -191,8 +287,21 @@ def import_customers_excel(
                     existing.code = code_val
                 existing.route = route or existing.route
                 existing.name = name or existing.name
-                existing.phone = phone or existing.phone
+                if phone is not None:
+                    existing.phone = phone or existing.phone
                 existing.contract = contract or existing.contract
+                if business_registration_number is not None:
+                    existing.business_registration_number = business_registration_number or None
+                if representative_name is not None:
+                    existing.representative_name = representative_name or None
+                if business_type is not None:
+                    existing.business_type = business_type or None
+                if business_category is not None:
+                    existing.business_category = business_category or None
+                if arrears_val is not None:
+                    existing.arrears = arrears_val
+                if contract_content is not None:
+                    existing.contract_content = contract_content or None
                 existing.address = address or existing.address
                 if latitude is not None:
                     existing.latitude = latitude
@@ -231,8 +340,14 @@ def import_customers_excel(
                 name=name,
                 phone=phone or None,
                 contract=contract,
+                contract_content=contract_content or None,
                 address=address or None,
                 memo=None,
+                business_registration_number=business_registration_number or None,
+                representative_name=representative_name or None,
+                business_type=business_type or None,
+                business_category=business_category or None,
+                arrears=arrears_val,
             )
             db.add(customer)
             created += 1

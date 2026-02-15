@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>거래명세표</title>
+  <link rel="stylesheet" href="/css/common.css">
+  <style>
+    /* 영수증 전용: common.css 다크 테마 무시, 흰 배경 + 검은 글자 */
+    body.receipt-page {
+      max-width: 210mm; margin: 0 auto; padding: 1rem;
+      font-family: 'Malgun Gothic', sans-serif;
+      background: #fff !important; color: #111 !important;
+    }
+    body.receipt-page #receiptContainer,
+    body.receipt-page #receiptContainer * { color: #111 !important; }
+    body.receipt-page .receipt-title { color: #2563eb !important; }
+    .receipt-actions { margin-bottom: 1rem; }
+    .receipt-actions button { margin-right: 0.5rem; }
+    .receipt-sheet {
+      border: 2px solid #2563eb;
+      padding: 12px;
+      margin-bottom: 24px;
+      background: #fff !important;
+      color: #111 !important;
+      box-sizing: border-box;
+    }
+    .receipt-sheet table {
+      border-collapse: collapse; width: 100%; font-size: 12px;
+      background: #fff !important; color: #111 !important;
+    }
+    .receipt-sheet th, .receipt-sheet td {
+      border: 1px solid #2563eb; padding: 4px 6px; vertical-align: top;
+      background: #fff !important; color: #111 !important;
+    }
+    .receipt-sheet th { background: #eff6ff !important; color: #111 !important; font-weight: 600; }
+    .receipt-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; color: #111 !important; }
+    .receipt-bank { font-size: 11px; color: #111 !important; }
+    .receipt-title { font-size: 18px; font-weight: bold; color: #2563eb; border: 2px solid #2563eb; padding: 6px 16px; text-align: center; }
+    .receipt-meta { text-align: right; font-size: 11px; color: #111 !important; }
+    .receipt-meta .copy-type { font-weight: bold; margin-bottom: 2px; color: #111 !important; }
+    .receipt-info-table { margin-bottom: 8px; background: #fff !important; color: #111 !important; }
+    .receipt-info-table table { background: #fff !important; }
+    .receipt-info-table td { padding: 3px 8px; font-size: 11px; background: #fff !important; color: #111 !important; }
+    .receipt-info-table .label { width: 70px; font-weight: 600; }
+    .party-section { display: flex; gap: 8px; margin-bottom: 8px; }
+    .party-block-wrap { flex: 1; }
+    .party-block-label { font-weight: bold; font-size: 12px; color: #2563eb; margin-bottom: 4px; }
+    .party-block { border: 1px solid #2563eb; background: #fff !important; color: #111 !important; }
+    .party-block th { width: 80px; text-align: left; padding: 4px 8px; background: #eff6ff !important; color: #111 !important; }
+    .party-block td { padding: 4px 8px; background: #fff !important; color: #111 !important; }
+    .items-table { margin-bottom: 8px; }
+    .items-table .col-product { width: 45%; }
+    .items-table .col-unit { width: 8%; text-align: center; }
+    .items-table .col-qty { width: 10%; text-align: right; }
+    .items-table .col-price { width: 12%; text-align: right; }
+    .items-table .col-amount { width: 12%; text-align: right; }
+    .items-table .col-tax { width: 13%; text-align: right; }
+    .items-table td, .items-table th { padding: 4px 6px; background: #fff !important; color: #111 !important; }
+    .items-table thead th { background: #eff6ff !important; }
+    .blank-rows td { border-top: none; height: 20px; background: #fff !important; }
+    .receipt-totals { border: 1px solid #2563eb; padding: 8px; background: #fff !important; color: #111 !important; }
+    .receipt-totals table { margin-left: auto; background: transparent !important; }
+    .receipt-totals td { border: none; padding: 2px 12px; background: transparent !important; color: #111 !important; }
+    .receipt-totals .label { text-align: right; }
+    .receipt-footer { display: flex; justify-content: space-between; margin-top: 12px; font-size: 10px; color: #111 !important; }
+    .receipt-footer .software { text-align: right; }
+    .error-msg { color: #dc2626; padding: 1rem; }
+    #receiptContainer { background: #fff !important; color: #111 !important; }
+    #receiptContainer .receipt-title { color: #2563eb !important; }
+    @media print {
+      body, html { margin: 0 !important; padding: 0 !important; background: #fff !important; color: #111 !important; }
+      body.receipt-page { background: #fff !important; color: #111 !important; padding: 4mm !important; }
+      .receipt-actions { display: none !important; }
+      .receipt-sheet {
+        break-inside: avoid;
+        margin-bottom: 6px !important;
+        padding: 8px !important;
+        background: #fff !important;
+        color: #111 !important;
+      }
+      .receipt-sheet table { font-size: 9px !important; }
+      .receipt-sheet th, .receipt-sheet td { padding: 2px 4px !important; }
+      .receipt-title { font-size: 12px !important; padding: 4px 10px !important; }
+      .receipt-bank, .receipt-meta, .receipt-info-table td { font-size: 8px !important; }
+      .party-block th, .party-block td { padding: 2px 4px !important; font-size: 8px !important; }
+      .blank-rows td { height: 12px !important; }
+      .receipt-totals { padding: 4px !important; }
+      .receipt-totals td { padding: 1px 8px !important; font-size: 9px !important; }
+      .receipt-footer { margin-top: 4px !important; font-size: 7px !important; }
+      .receipt-sheet:last-of-type { page-break-after: auto; }
+      @page { size: A4; margin: 6mm; }
+    }
+  </style>
+</head>
+<body class="receipt-page">
+  <div class="receipt-actions">
+    <button type="button" class="btn btn-primary" onclick="window.print()">인쇄 (공급자/공급받는자 2장)</button>
+    <button type="button" class="btn btn-secondary" onclick="(function(){try{window.close()}catch(e){}if(!window.closed)history.back()})()">닫기</button>
+  </div>
+  <div id="receiptContainer"></div>
+  <div id="errorBox" class="error-msg" style="display:none"></div>
+
+  <script>
+    const API_BASE = '/api';
+    async function fetchReceipt(stopId) {
+      const res = await fetch(API_BASE + '/stops/' + stopId + '/receipt', { credentials: 'include' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw { status: res.status, detail: data.detail || res.statusText };
+      return data;
+    }
+    function formatNum(n) { return (n ?? 0).toLocaleString('ko-KR'); }
+    function renderReceipt(data, copyType) {
+      const s = data.supplier || {};
+      const b = data.buyer || {};
+      const items = data.items || [];
+      const emptyRows = Math.max(0, 8 - items.length);
+      let itemsHtml = items.map(it => `
+        <tr>
+          <td class="col-product">${escapeHtml(it.product_spec || '')}</td>
+          <td class="col-unit">${escapeHtml(it.unit || '')}</td>
+          <td class="col-qty">${formatNum(it.quantity)}</td>
+          <td class="col-price">${formatNum(it.unit_price)}</td>
+          <td class="col-amount">${formatNum(it.supply_amount)}</td>
+          <td class="col-tax">${formatNum(it.tax_amount)}</td>
+        </tr>
+      `).join('');
+      if (emptyRows > 0) {
+        itemsHtml += '<tr><td colspan="6" style="font-size:10px;color:#111;background:#fff!important">==== 이하여백 ====</td></tr>';
+      }
+      for (let i = 0; i < emptyRows; i++) {
+        itemsHtml += '<tr class="blank-rows"><td colspan="6">&nbsp;</td></tr>';
+      }
+      return `
+        <div class="receipt-sheet">
+          <div class="receipt-header">
+            <div>
+              <div class="receipt-bank">${escapeHtml(data.bank_info || '')}</div>
+              <div class="receipt-info-table">
+                <table><tr><td class="label">일자</td><td>${escapeHtml(data.date_str || '')} ${escapeHtml(data.doc_no || '')}</td></tr></table>
+              </div>
+            </div>
+            <div class="receipt-title">거래명세표</div>
+            <div class="receipt-meta">
+              <div class="copy-type">(1/1)</div>
+              <div>(${escapeHtml(copyType)})</div>
+            </div>
+          </div>
+          <div class="party-section">
+            <div class="party-block-wrap">
+              <div class="party-block-label">공급자</div>
+              <table class="party-block">
+                <tr><th>등록번호</th><td>${escapeHtml(s.business_registration_number || '')}</td></tr>
+                <tr><th>상호</th><td>${escapeHtml(s.name || '')}</td></tr>
+                <tr><th>성명</th><td>${escapeHtml(s.representative_name || '')}</td></tr>
+                <tr><th>주소</th><td>${escapeHtml(s.address || '')}</td></tr>
+                <tr><th>업태</th><td>${escapeHtml(s.business_type || '')}</td></tr>
+                <tr><th>종목</th><td>${escapeHtml(s.business_category || '')}</td></tr>
+              </table>
+            </div>
+            <div class="party-block-wrap">
+              <div class="party-block-label">공급받는자</div>
+              <table class="party-block">
+                <tr><th>등록번호</th><td>${escapeHtml(b.business_registration_number || '')}</td></tr>
+                <tr><th>상호</th><td>${escapeHtml(b.name || '')}</td></tr>
+                <tr><th>성명</th><td>${escapeHtml(b.representative_name || '')}</td></tr>
+                <tr><th>주소</th><td>${escapeHtml(b.address || '')}</td></tr>
+                <tr><th>업태</th><td>${escapeHtml(b.business_type || '')}</td></tr>
+                <tr><th>종목</th><td>${escapeHtml(b.business_category || '')}</td></tr>
+              </table>
+            </div>
+          </div>
+          <table class="items-table">
+            <thead><tr>
+              <th class="col-product">품목 (규격)</th>
+              <th class="col-unit">단위</th>
+              <th class="col-qty">수량</th>
+              <th class="col-price">단가</th>
+              <th class="col-amount">금액</th>
+              <th class="col-tax">세액</th>
+            </tr></thead>
+            <tbody>${itemsHtml}</tbody>
+          </table>
+          <div class="receipt-totals">
+            <table style="width:auto">
+              <tr><td class="label">공급가액</td><td>₩${formatNum(data.supply_total)}</td></tr>
+              <tr><td class="label">세액</td><td>₩${formatNum(data.tax_total)}</td></tr>
+              <tr><td class="label">합계</td><td>₩${formatNum(data.total)}</td></tr>
+              <tr><td class="label">전미수</td><td>₩${formatNum(data.prev_arrears)}</td></tr>
+              <tr><td class="label">미수금</td><td>₩${formatNum(data.arrears)}</td></tr>
+            </table>
+          </div>
+          <div class="receipt-footer">
+            <span>${escapeHtml(data.doc_no || '')}</span>
+          </div>
+        </div>
+      `;
+    }
+    function escapeHtml(s) {
+      if (s == null) return '';
+      const d = document.createElement('div');
+      d.textContent = String(s);
+      return d.innerHTML;
+    }
+    (async function init() {
+      const params = new URLSearchParams(location.search);
+      const stopId = params.get('stop_id');
+      if (!stopId) {
+        document.getElementById('errorBox').textContent = 'stop_id가 필요합니다.';
+        document.getElementById('errorBox').style.display = 'block';
+        return;
+      }
+      try {
+        const data = await fetchReceipt(stopId);
+        const container = document.getElementById('receiptContainer');
+        container.innerHTML = renderReceipt(data, '공급자 보관용') + renderReceipt(data, '공급받는자 보관용');
+      } catch (e) {
+        if (e.status === 401) {
+          window.location.href = '/admin.html';
+          return;
+        }
+        document.getElementById('errorBox').textContent = e.detail || '영수증을 불러올 수 없습니다.';
+        document.getElementById('errorBox').style.display = 'block';
+      }
+    })();
+  </script>
+</body>
+</html>

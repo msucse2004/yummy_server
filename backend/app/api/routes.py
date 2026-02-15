@@ -7,7 +7,7 @@ from app.core.route_access import require_route_access
 from app.database import get_db
 from app.models import User, Route, Plan, RouteAssignment
 from app.models.user import Role
-from app.schemas.route import RouteCreate, RouteUpdate, RouteResponse, RouteAssignmentCreate
+from app.schemas.route import RouteCreate, RouteUpdate, RouteResponse, RouteAssignmentCreate, RouteAssignmentSet
 
 router = APIRouter(prefix="/api/routes", tags=["routes"])
 RequireAdmin = Depends(require_role(Role.ADMIN))
@@ -99,6 +99,25 @@ def assign_driver(
         return
     assignment = RouteAssignment(route_id=route_id, driver_id=data.driver_id)
     db.add(assignment)
+    db.commit()
+
+
+@router.put("/{route_id}/assign", status_code=status.HTTP_204_NO_CONTENT)
+def set_route_driver(
+    route_id: int,
+    data: RouteAssignmentSet,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+    _: User = RequireAdmin,
+):
+    """기사 배정 설정 (기존 배정 제거 후 새로 배정, driver_id 없으면 배정 해제)"""
+    from sqlalchemy import delete
+    route = _get_route_with_assignments(db, route_id)
+    if not route:
+        raise HTTPException(status_code=404, detail="루트를 찾을 수 없습니다")
+    db.execute(delete(RouteAssignment).where(RouteAssignment.route_id == route_id))
+    if data and data.driver_id:
+        db.add(RouteAssignment(route_id=route_id, driver_id=data.driver_id))
     db.commit()
 
 

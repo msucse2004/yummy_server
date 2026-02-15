@@ -20,6 +20,11 @@ class RouteAssignmentCreate(BaseModel):
     driver_id: int
 
 
+class RouteAssignmentSet(BaseModel):
+    """기사 배정 설정 (driver_id 없으면 배정 해제)"""
+    driver_id: int | None = None
+
+
 class RouteResponse(RouteBase):
     id: int
     plan_id: int
