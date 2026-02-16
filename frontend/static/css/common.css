@@ -171,6 +171,9 @@ tr:nth-child(even) { background: rgba(255,255,255,0.02); }
 .route-marker-origin { background: none !important; border: none !important; }
 tr.plan-row-clickable { cursor: pointer; }
 
+.arrears-clickable { cursor: pointer; text-decoration: underline; }
+.arrears-clickable:hover { opacity: 0.9; }
+
 /* Links - 카드/테이블 내 링크 가독성 */
 .card a,
 table a {

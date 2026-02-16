@@ -40,7 +40,7 @@ class DeleteAllRequest(BaseModel):
 router = APIRouter(prefix="/api/customers", tags=["customers"])
 RequireAdmin = Depends(require_role(Role.ADMIN))
 
-EXCEL_HEADERS = ["코드", "루트", "이름", "사업자번호", "대표", "계약", "업태", "종목", "미수금액", "계약내용", "주소", "위도", "경도"]
+EXCEL_HEADERS = ["코드", "루트", "이름", "사업자번호", "대표", "계약", "업태", "종목", "미수금액", "계약내용", "주소"]
 
 
 def _get_delivery_route_count(db: Session) -> int:
@@ -177,8 +177,6 @@ def export_customers_excel(
             int(c.arrears) if c.arrears is not None else "",
             c.contract_content or "",
             c.address or "",
-            float(c.latitude) if c.latitude is not None else "",
-            float(c.longitude) if c.longitude is not None else "",
         ])
     buf = io.BytesIO()
     wb.save(buf)
@@ -219,8 +217,9 @@ def import_customers_excel(
             route_raw = str(row[1]).strip() if len(row) > 1 and row[1] is not None else None
             route = _normalize_route(route_raw, max_routes) if route_raw else None
             name = str(row[2]).strip() if len(row) > 2 and row[2] is not None else ""
-            # 13열(신규): 코드,루트,이름,사업자번호,대표,계약,업태,종목,미수금액,계약내용,주소,위도,경도
+            # 13열(구): 코드,루트,이름,사업자번호,대표,계약,업태,종목,미수금액,계약내용,주소,위도,경도
             # 12열(구): 코드,루트,이름,사업자번호,대표,계약,업태,종목,계약내용,주소,위도,경도
+            # 11열(현재): 코드,루트,이름,사업자번호,대표,계약,업태,종목,미수금액,계약내용,주소 (위도/경도 없음)
             # 9열(구형): 코드,루트,이름,연락처,계약,계약내용,주소,위도,경도
             arrears_val = None
             if len(row) >= 13:
@@ -245,6 +244,18 @@ def import_customers_excel(
                 address = str(row[9]).strip() if row[9] is not None else None
                 latitude = _parse_float(row[10])
                 longitude = _parse_float(row[11])
+                phone = None
+            elif len(row) >= 11:
+                business_registration_number = str(row[3]).strip() if row[3] is not None else None
+                representative_name = str(row[4]).strip() if row[4] is not None else None
+                contract_val = str(row[5]).strip() if row[5] is not None else None
+                business_type = str(row[6]).strip() if row[6] is not None else None
+                business_category = str(row[7]).strip() if row[7] is not None else None
+                arrears_val = _parse_float(row[8])
+                contract_content_raw = str(row[9]).strip() if row[9] is not None else None
+                address = str(row[10]).strip() if row[10] is not None else None
+                latitude = None
+                longitude = None
                 phone = None
             elif len(row) >= 9:
                 business_registration_number = None

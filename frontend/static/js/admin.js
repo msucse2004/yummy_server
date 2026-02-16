@@ -20,7 +20,7 @@ document.querySelectorAll('.nav-tabs a').forEach(a => {
     const tab = a.dataset.tab;
     document.getElementById('tab-' + tab).style.display = 'block';
     if (tab === 'plans') loadPlans();
-    if (tab === 'customers') loadCustomers();
+    if (tab === 'customers') { loadCustomers(); bindCustomerSearch(); }
     if (tab === 'arrears') loadArrears();
     if (tab === 'items') loadItems();
     if (tab === 'users') loadUsers();
@@ -482,8 +482,22 @@ function bindCustomerSortHandlers() {
   });
 }
 
+let customerSearchTerm = '';
+
+function bindCustomerSearch() {
+  const inp = document.getElementById('customerSearchInput');
+  if (!inp) return;
+  inp.oninput = () => {
+    customerSearchTerm = inp.value.trim().toLowerCase();
+    renderCustomers();
+  };
+}
+
 async function loadCustomers() {
   customersData = await api.customers.list();
+  const inp = document.getElementById('customerSearchInput');
+  if (inp) inp.value = '';
+  customerSearchTerm = '';
   renderCustomers();
   updateCustomerSortIcons();
   bindCustomerSortHandlers();
@@ -491,17 +505,49 @@ async function loadCustomers() {
 
 let arrearsSortCol = 'arrears';
 let arrearsSortAsc = false;
+let arrearsSearchTerm = '';
+let arrearsData = [];
+
+function bindArrearsSearch() {
+  const inp = document.getElementById('arrearsSearchInput');
+  if (!inp) return;
+  inp.oninput = () => {
+    arrearsSearchTerm = inp.value.trim().toLowerCase();
+    renderArrears();
+  };
+}
 
 let _partialRepayCustomerId = null;
 let _partialRepayCurrentArrears = 0;
 
 async function loadArrears() {
   const list = await api.customers.list();
-  const filtered = list.filter(c => {
+  arrearsData = list.filter(c => {
     const amt = c.arrears != null && c.arrears !== '' ? Number(c.arrears) : 0;
     return amt > 0;
   });
-  const sorted = [...filtered].sort((a, b) => {
+  const inp = document.getElementById('arrearsSearchInput');
+  if (inp) inp.value = '';
+  arrearsSearchTerm = '';
+  renderArrears();
+  updateArrearsSortIcons();
+  bindArrearsSortHandlers();
+  bindArrearsSearch();
+}
+
+function renderArrears() {
+  let list = arrearsData;
+  if (arrearsSearchTerm) {
+    const q = arrearsSearchTerm;
+    list = list.filter(c => {
+      const s = [
+        c.code, c.name, c.route, c.address, c.representative_name,
+        c.business_registration_number, c.contract_content, c.business_type, c.business_category
+      ].filter(Boolean).join(' ').toLowerCase();
+      return s.includes(q);
+    });
+  }
+  const sorted = [...list].sort((a, b) => {
     const av = a[arrearsSortCol];
     const bv = b[arrearsSortCol];
     const cmp = arrearsSortCol === 'arrears' || arrearsSortCol === 'code'
@@ -522,8 +568,6 @@ async function loadArrears() {
       </td>
     </tr>
   `}).join('');
-  updateArrearsSortIcons();
-  bindArrearsSortHandlers();
 }
 
 async function fullRepayment(customerId) {
@@ -531,9 +575,30 @@ async function fullRepayment(customerId) {
   try {
     await api.customers.update(customerId, { arrears: 0 });
     loadArrears();
+    loadCustomers();
   } catch (e) {
     alert(e?.detail || '변제 처리 실패');
   }
+}
+
+async function doFullRepaymentFromModal() {
+  if (!_partialRepayCustomerId) return;
+  try {
+    await api.customers.update(_partialRepayCustomerId, { arrears: 0 });
+    closePartialRepayModal();
+    loadArrears();
+    loadCustomers();
+  } catch (e) {
+    alert(e?.detail || '변제 처리 실패');
+  }
+}
+
+function showArrearsRepayModal(customerId) {
+  const c = customersData.find(x => x.id === customerId);
+  if (!c) return;
+  const amt = (c.arrears != null && c.arrears !== '' ? Number(c.arrears) : 0);
+  if (amt <= 0) return;
+  showPartialRepayModal(customerId, amt, c.name || '');
 }
 
 function showPartialRepayModal(customerId, currentArrears, customerName) {
@@ -567,6 +632,7 @@ async function submitPartialRepay() {
     await api.customers.update(_partialRepayCustomerId, { arrears: newArrears });
     closePartialRepayModal();
     loadArrears();
+    loadCustomers();
   } catch (e) {
     alert(e?.detail || '변제 처리 실패');
   }
@@ -586,7 +652,8 @@ function bindArrearsSortHandlers() {
     th.onclick = () => {
       arrearsSortCol = th.dataset.sort;
       arrearsSortAsc = !arrearsSortAsc;
-      loadArrears();
+      renderArrears();
+      updateArrearsSortIcons();
     };
   });
 }
@@ -602,7 +669,18 @@ function updateCustomerSortIcons() {
 
 function renderCustomers() {
   const numCols = ['latitude', 'longitude', 'arrears'];
-  const sorted = [...customersData].sort((a, b) => {
+  let list = customersData;
+  if (customerSearchTerm) {
+    const q = customerSearchTerm;
+    list = list.filter(c => {
+      const s = [
+        c.code, c.name, c.route, c.address, c.representative_name,
+        c.business_registration_number, c.contract_content, c.business_type, c.business_category
+      ].filter(Boolean).join(' ').toLowerCase();
+      return s.includes(q);
+    });
+  }
+  const sorted = [...list].sort((a, b) => {
     const av = a[customerSortCol];
     const bv = b[customerSortCol];
     let cmp;
@@ -615,7 +693,9 @@ function renderCustomers() {
     }
     return customerSortAsc ? cmp : -cmp;
   });
-  document.getElementById('customersList').innerHTML = sorted.map(c => `
+  document.getElementById('customersList').innerHTML = sorted.map(c => {
+    const amt = (c.arrears != null && c.arrears !== '' ? Number(c.arrears) : 0);
+    return `
     <tr>
       <td>${c.code || '-'}</td>
       <td>${c.route || '-'}</td>
@@ -625,7 +705,7 @@ function renderCustomers() {
       <td>${c.contract || '-'}</td>
       <td>${c.business_type || '-'}</td>
       <td>${c.business_category || '-'}</td>
-      <td>${(c.arrears != null && c.arrears !== '' ? Number(c.arrears) : 0).toLocaleString('ko-KR')}원</td>
+      <td class="${amt > 0 ? 'arrears-clickable' : ''}" ${amt > 0 ? `onclick="showArrearsRepayModal(${c.id})" title="클릭하여 변제"` : ''}>${amt.toLocaleString('ko-KR')}원</td>
       <td>${c.contract_content || '-'}</td>
       <td>${(() => {
         const addr = c.address || '-';
@@ -639,7 +719,8 @@ function renderCustomers() {
         <button class="btn btn-secondary" onclick="deleteCustomer(${c.id})">삭제</button>
       </td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -906,8 +987,39 @@ if (customerFormEl) customerFormEl.onsubmit = async (e) => {
   }
 };
 
+let itemsData = [];
+let itemSearchTerm = '';
+
+function bindItemSearch() {
+  const inp = document.getElementById('itemSearchInput');
+  if (!inp) return;
+  inp.oninput = () => {
+    itemSearchTerm = inp.value.trim().toLowerCase();
+    renderItems();
+  };
+}
+
 async function loadItems() {
-  const list = await api.items.list();
+  itemsData = await api.items.list();
+  const inp = document.getElementById('itemSearchInput');
+  if (inp) inp.value = '';
+  itemSearchTerm = '';
+  renderItems();
+  bindItemSearch();
+}
+
+function renderItems() {
+  let list = itemsData;
+  if (itemSearchTerm) {
+    const q = itemSearchTerm;
+    list = list.filter(i => {
+      const s = [
+        i.code, i.product, i.unit, i.description,
+        i.unit_price != null ? String(i.unit_price) : ''
+      ].filter(Boolean).join(' ').toLowerCase();
+      return s.includes(q);
+    });
+  }
   document.getElementById('itemsList').innerHTML = list.map(i => `
     <tr>
       <td>${i.code || '-'}</td>
@@ -1072,8 +1184,39 @@ async function importUsersExcel(ev) {
   ev.target.value = '';
 }
 
+let usersData = [];
+let userSearchTerm = '';
+
+function bindUserSearch() {
+  const inp = document.getElementById('userSearchInput');
+  if (!inp) return;
+  inp.oninput = () => {
+    userSearchTerm = inp.value.trim().toLowerCase();
+    renderUsers();
+  };
+}
+
 async function loadUsers() {
-  const list = await api.users.list();
+  usersData = await api.users.list();
+  const inp = document.getElementById('userSearchInput');
+  if (inp) inp.value = '';
+  userSearchTerm = '';
+  renderUsers();
+  bindUserSearch();
+}
+
+function renderUsers() {
+  let list = usersData;
+  if (userSearchTerm) {
+    const q = userSearchTerm;
+    list = list.filter(u => {
+      const s = [
+        u.username, u.display_name, u.ssn, u.phone, u.resume, u.status,
+        u.role === 'ADMIN' ? '관리자' : '기사'
+      ].filter(Boolean).join(' ').toLowerCase();
+      return s.includes(q);
+    });
+  }
   document.getElementById('usersList').innerHTML = list.map(u => `
     <tr>
       <td>${u.username}</td>

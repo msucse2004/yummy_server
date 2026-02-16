@@ -62,6 +62,7 @@
         <div class="card">
           <h2>거래처</h2>
           <p>
+            <input type="text" id="customerSearchInput" placeholder="코드, 상호, 주소 등 검색" style="max-width:280px; margin-right:0.5rem; padding:0.4rem 0.6rem;">
             <button class="btn btn-primary" type="button" onclick="showCustomerForm()">+ 추가</button>
             <button class="btn btn-secondary" type="button" onclick="exportCustomersExcel()">Excel 내보내기</button>
             <label class="btn btn-secondary" style="margin:0; cursor:pointer">
@@ -90,7 +91,10 @@
       <div id="tab-arrears" class="tab-content" style="display:none">
         <div class="card">
           <h2>수금</h2>
-          <p>거래처별 미수금 현황</p>
+          <p>
+            <input type="text" id="arrearsSearchInput" placeholder="코드, 상호, 주소 등 검색" style="max-width:280px; margin-right:0.5rem; padding:0.4rem 0.6rem;">
+            거래처별 미수금 현황
+          </p>
           <table><thead><tr>
             <th class="sortable" data-sort="code">코드 <span class="sort-icon"></span></th>
             <th class="sortable" data-sort="name">상호 <span class="sort-icon"></span></th>
@@ -102,16 +106,19 @@
 
       <div id="partialRepayModal" class="modal-overlay" style="display:none" onclick="if(event.target===this) closePartialRepayModal()">
         <div class="modal-box" onclick="event.stopPropagation()">
-          <h3>부분 변제</h3>
+          <h3>미수금 변제</h3>
           <p id="partialRepayCustomerName" class="form-group"></p>
           <p class="form-group">
-            <label for="partialRepayAmount">변제 금액 (원)</label>
+            <button type="button" class="btn btn-primary" onclick="doFullRepaymentFromModal()">전액변제</button>
+          </p>
+          <p class="form-group">
+            <label for="partialRepayAmount">부분 변제 금액 (원)</label>
             <input type="number" id="partialRepayAmount" min="1" step="1" placeholder="금액 입력">
           </p>
           <p class="form-group"><small id="partialRepayCurrentArrears"></small></p>
           <div class="modal-actions">
             <button type="button" class="btn btn-secondary" onclick="closePartialRepayModal()">취소</button>
-            <button type="button" class="btn btn-primary" onclick="submitPartialRepay()">변제</button>
+            <button type="button" class="btn btn-primary" onclick="submitPartialRepay()">부분변제</button>
           </div>
         </div>
       </div>
@@ -120,6 +127,7 @@
         <div class="card">
           <h2>품목</h2>
           <p>
+            <input type="text" id="itemSearchInput" placeholder="코드, 상품, 단위, 설명 등 검색" style="max-width:280px; margin-right:0.5rem; padding:0.4rem 0.6rem;">
             <button class="btn btn-primary" type="button" onclick="showItemForm()">+ 추가</button>
             <button class="btn btn-secondary" type="button" onclick="exportItemsExcel()">Excel 내보내기</button>
             <label class="btn btn-secondary" style="margin:0; cursor:pointer">
@@ -135,6 +143,7 @@
         <div class="card">
           <h2>사용자</h2>
           <p>
+            <input type="text" id="userSearchInput" placeholder="아이디, 이름, 전화번호 등 검색" style="max-width:280px; margin-right:0.5rem; padding:0.4rem 0.6rem;">
             <button class="btn btn-primary" type="button" onclick="showUserForm()">+ 추가</button>
             <button class="btn btn-secondary" type="button" onclick="exportUsersExcel()">Excel 내보내기</button>
             <label class="btn btn-secondary" style="margin:0; cursor:pointer">
@@ -395,11 +404,11 @@
           <label for="customerAddress">주소</label>
           <input type="text" id="customerAddress" placeholder="주소">
         </div>
-        <div class="form-group">
+        <div class="form-group" style="display:none">
           <label for="customerLatitude">위도</label>
           <input type="number" id="customerLatitude" placeholder="위도 (예: 37.5666805)" step="any">
         </div>
-        <div class="form-group">
+        <div class="form-group" style="display:none">
           <label for="customerLongitude">경도</label>
           <input type="number" id="customerLongitude" placeholder="경도 (예: 126.9784147)" step="any">
         </div>
