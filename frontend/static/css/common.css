@@ -295,6 +295,53 @@ table a:hover {
 }
 .stop-card.expanded .toggle-icon { transform: rotate(180deg); }
 
+/* Driver - 다음 목적지 전체화면 */
+.next-dest-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+}
+.next-dest-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--accent);
+}
+.next-dest-header h2 { margin: 0; font-size: 1.1rem; }
+.next-dest-info {
+  padding: 0.75rem 1rem;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--accent);
+  font-size: 0.95rem;
+}
+.next-dest-info .dest-name { font-weight: 600; }
+.next-dest-info .dest-items { margin-top: 0.25rem; }
+.next-dest-info .dest-items.delivery-items-highlight { font-size: 1.05rem; font-weight: 600; color: var(--highlight); }
+.delivery-items-highlight { font-size: 1.05rem; font-weight: 600; color: var(--highlight); }
+.next-dest-map {
+  flex: 1;
+  min-height: 250px;
+  width: 100%;
+  position: relative;
+  background: rgba(0,0,0,0.2);
+}
+.next-dest-map .leaflet-container { height: 100%; font-family: inherit; }
+.next-dest-marker-start, .next-dest-marker-dest { background: none !important; border: none !important; }
+.next-dest-actions {
+  display: flex;
+  gap: 0.5rem;
+  padding: 1rem;
+  flex-shrink: 0;
+  border-top: 1px solid var(--accent);
+}
+.next-dest-actions .btn { flex: 1; }
+.next-dest-actions a.btn { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+
 /* Admin - 기사 배정 표시 */
 .driver-assign-row {
   margin: 0.5rem 0;

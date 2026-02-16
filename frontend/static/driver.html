@@ -6,6 +6,7 @@
   <title>Yummy - Driver</title>
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 </head>
 <body>
   <div class="app-shell">
@@ -50,6 +51,21 @@
       </div>
     </main>
   </div>
+
+  <div id="nextDestFullscreen" class="next-dest-fullscreen" style="display:none">
+    <div class="next-dest-header">
+      <h2 id="nextDestTitle">다음 목적지</h2>
+      <button type="button" class="btn btn-secondary" onclick="closeNextDestFullscreen()">뒤로가기</button>
+    </div>
+    <div id="nextDestInfo" class="next-dest-info"></div>
+    <div id="nextDestMapContainer" class="next-dest-map"></div>
+    <div class="next-dest-actions">
+      <a id="nextDestKakaoNavLink" href="#" target="_blank" class="btn btn-secondary">카카오네비에서 열기</a>
+      <button type="button" class="btn btn-primary" id="nextDestCompleteBtn" onclick="completeFromNextDest()">배달완료</button>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="/js/api.js"></script>
   <script src="/js/driver.js"></script>
 </body>
