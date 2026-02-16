@@ -226,6 +226,11 @@ async function openPlan(planId) {
   ]);
   const { plan, routes, previous_day_drivers } = detail;
   const drivers = users.filter(u => u.role === 'DRIVER');
+  const getDriverName = (driverId) => {
+    if (!driverId) return '-';
+    const u = drivers.find(d => d.id === driverId);
+    return u ? (u.display_name || u.username) : '-';
+  };
   const html = `
     <div class="plan-detail-header">
       <h2>${plan.route || '-'} - ${plan.name}</h2>
@@ -233,16 +238,14 @@ async function openPlan(planId) {
     ${routes.map(r => {
       const currentDriver = r.assignments?.[0];
       const prevDriver = previous_day_drivers?.[r.name];
-      const defaultId = (currentDriver?.driver_id) || (prevDriver?.driver_id) || '';
+      const defaultId = (currentDriver?.driver_id) || (prevDriver?.driver_id) || null;
+      const driverName = getDriverName(defaultId);
       const statusText = r.delivery_status || '배송전';
       const statusClass = statusText === '배송완료' ? 'plan-status-done' : statusText.startsWith('배송중') ? 'plan-status-progress' : 'plan-status-pending';
       return `
       <div class="card">
         <h3>${r.name} <span class="plan-status-badge ${statusClass}">${statusText}</span></h3>
-        <p>기사 배정: <select onchange="assignDriver(${r.id}, this.value, ${planId})">
-          <option value="">-</option>
-          ${drivers.map(u => `<option value="${u.id}" ${defaultId === u.id ? 'selected' : ''}>${u.display_name || u.username}</option>`).join('')}
-        </select></p>
+        <p class="driver-assign-row"><span class="driver-assign-label">기사 배정:</span> <span class="driver-assign-name">${driverName}</span> <button type="button" class="btn btn-secondary btn-sm" onclick="showDriverAssignModal(${r.id}, ${planId}, '${(r.name || '').replace(/'/g, "\\'")}', ${defaultId || 'null'})">기사 변경</button></p>
         <p><a href="#" onclick="event.preventDefault();openRoute(${r.id}, ${planId})">스탑 목록</a></p>
       </div>
     `}).join('')}
@@ -251,22 +254,56 @@ async function openPlan(planId) {
   document.getElementById('planDetail').innerHTML = html;
   document.getElementById('planDetail').dataset.planId = planId;
   document.getElementById('planDetail').style.display = 'block';
+  window._planDrivers = drivers;
+}
+
+function showDriverAssignModal(routeId, planId, routeName, currentDriverId) {
+  const drivers = window._planDrivers || [];
+  const modalTitle = document.getElementById('driverAssignModalTitle');
+  const routeNameEl = document.getElementById('driverAssignModalRouteName');
+  const listEl = document.getElementById('driverAssignList');
+  if (!modalTitle || !listEl) return;
+  modalTitle.textContent = '기사 배정 변경';
+  routeNameEl.textContent = routeName || '';
+  listEl.innerHTML = [
+    '<div class="driver-assign-option" data-driver-id="">배정 해제</div>',
+    ...drivers.map(u => `
+      <div class="driver-assign-option ${currentDriverId === u.id ? 'selected' : ''}" data-driver-id="${u.id}">${(u.display_name || u.username || '').replace(/</g, '&lt;')}</div>
+    `),
+  ].join('');
+  listEl.dataset.routeId = routeId;
+  listEl.dataset.planId = planId;
+  listEl.querySelectorAll('.driver-assign-option').forEach(el => {
+    el.onclick = () => {
+      const id = el.dataset.driverId;
+      applyDriverAssign(id === '' ? null : parseInt(id));
+    };
+  });
+  document.getElementById('driverAssignModal').style.display = 'flex';
+}
+
+function closeDriverAssignModal() {
+  document.getElementById('driverAssignModal').style.display = 'none';
+}
+
+async function applyDriverAssign(driverId) {
+  const listEl = document.getElementById('driverAssignList');
+  const routeId = parseInt(listEl?.dataset.routeId);
+  const planId = parseInt(listEl?.dataset.planId);
+  if (!routeId || !planId) return;
+  try {
+    await api.routes.setAssign(routeId, driverId);
+    closeDriverAssignModal();
+    openPlan(planId);
+  } catch (e) {
+    alert(e?.detail || e?.message || '배정 실패');
+  }
 }
 
 function addRoute(planId) {
   const name = prompt('루트 이름');
   if (!name) return;
   api.routes.create(planId, { name, sequence: 0 }).then(() => openPlan(planId));
-}
-
-async function assignDriver(routeId, driverId, planId) {
-  try {
-    const id = (driverId && driverId !== '') ? parseInt(driverId) : null;
-    await api.routes.setAssign(routeId, id);
-    if (planId) openPlan(planId);
-  } catch (e) {
-    alert(e?.detail || e?.message || '배정 실패');
-  }
 }
 
 function formatOrderItem(oi) {
@@ -293,7 +330,10 @@ async function openRoute(routeId, planId) {
     .filter(s => s.lat != null && s.lng != null);
   const hasMap = pointsWithCoords.length > 0 || (companyLoc?.latitude && companyLoc?.longitude);
   const mapHtml = hasMap
-    ? `<div id="routeMap" class="route-map" style="height:280px; width:100%; margin-bottom:1rem;"></div>`
+    ? `<div class="route-map-wrapper" onclick="openMapFullscreenModal()">
+        <div id="routeMap" class="route-map" style="height:280px; width:100%; margin-bottom:1rem;"></div>
+        <div class="route-map-overlay">클릭하여 크게 보기</div>
+       </div>`
     : `<p class="route-map-placeholder">배송지 좌표가 있는 곳만 경로에 표시됩니다.</p>`;
   window._routeCompanyLoc = companyLoc;
   window._routeStopsData = { stops, routeId, planId };
@@ -417,6 +457,35 @@ function initRouteMap(pointsWithCoords, companyLoc, allStops, containerId, route
     window._routeMap = map;
   } else {
     window._routeMapFullscreen = map;
+  }
+}
+
+function openMapFullscreenModal() {
+  const data = window._routeMapData;
+  if (!data) return;
+  const { pointsWithCoords, companyLoc, stops, route } = data;
+  const modal = document.getElementById('mapFullscreenModal');
+  const container = document.getElementById('routeMapFullscreen');
+  if (!modal || !container) return;
+  if (window._routeMapFullscreen) {
+    window._routeMapFullscreen.remove();
+    window._routeMapFullscreen = null;
+  }
+  container.innerHTML = '';
+  modal.style.display = 'flex';
+  setTimeout(() => {
+    initRouteMap(pointsWithCoords, companyLoc, stops, 'routeMapFullscreen', route);
+    const fsMap = window._routeMapFullscreen;
+    if (fsMap) fsMap.invalidateSize();
+  }, 100);
+}
+
+function closeMapFullscreenModal() {
+  const modal = document.getElementById('mapFullscreenModal');
+  if (modal) modal.style.display = 'none';
+  if (window._routeMapFullscreen) {
+    window._routeMapFullscreen.remove();
+    window._routeMapFullscreen = null;
   }
 }
 

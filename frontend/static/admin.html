@@ -414,6 +414,27 @@
     </div>
   </div>
 
+  <div id="mapFullscreenModal" class="modal-overlay map-fullscreen-modal" style="display:none" onclick="if(event.target===this) closeMapFullscreenModal()">
+    <div class="modal-box map-fullscreen-box" onclick="event.stopPropagation()">
+      <div class="map-fullscreen-header">
+        <h3>경로 지도</h3>
+        <button type="button" class="btn btn-secondary" onclick="closeMapFullscreenModal()">닫기</button>
+      </div>
+      <div id="routeMapFullscreen" class="route-map-fullscreen"></div>
+    </div>
+  </div>
+
+  <div id="driverAssignModal" class="modal-overlay" style="display:none" onclick="if(event.target===this) closeDriverAssignModal()">
+    <div class="modal-box driver-assign-modal" onclick="event.stopPropagation()">
+      <h3 id="driverAssignModalTitle">기사 배정 변경</h3>
+      <p id="driverAssignModalRouteName" class="form-group" style="font-size:1rem;margin-bottom:0.75rem"></p>
+      <div id="driverAssignList" class="driver-assign-list"></div>
+      <div class="modal-actions" style="margin-top:1rem">
+        <button type="button" class="btn btn-secondary" onclick="closeDriverAssignModal()">취소</button>
+      </div>
+    </div>
+  </div>
+
   <div id="planModal" class="modal-overlay" style="display:none" onclick="if(event.target===this) closePlanModal()">
     <div class="modal-box" onclick="event.stopPropagation()">
       <h3>플랜 수정</h3>

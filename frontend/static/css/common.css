@@ -255,6 +255,129 @@ table a:hover {
 }
 
 .card h2 { margin: 0 0 0.75rem; font-size: 1.1rem; }
+.card h3 { margin: 0 0 0.5rem; font-size: 1rem; }
+
+/* Driver - 접이식 stop card */
+.stop-card {
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+}
+.stop-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.75rem;
+  cursor: pointer;
+  background: rgba(255,255,255,0.03);
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.stop-card-header:hover {
+  background: rgba(255,255,255,0.06);
+}
+.stop-card-header .stop-summary {
+  flex: 1;
+  font-weight: 500;
+}
+.stop-card-body {
+  display: none;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--accent);
+  background: rgba(0,0,0,0.15);
+}
+.stop-card.expanded .stop-card-body { display: block; }
+.stop-card-header .toggle-icon {
+  color: var(--muted);
+  font-size: 0.75rem;
+  transition: transform 0.2s;
+}
+.stop-card.expanded .toggle-icon { transform: rotate(180deg); }
+
+/* Admin - 기사 배정 표시 */
+.driver-assign-row {
+  margin: 0.5rem 0;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.driver-assign-label { color: var(--muted); }
+.driver-assign-name { font-weight: 600; font-size: 1.05rem; }
+.btn-sm { padding: 0.35rem 0.65rem; font-size: 0.9rem; }
+
+/* Admin - 기사 배정 변경 모달 */
+.driver-assign-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.driver-assign-option {
+  padding: 0.75rem 1rem;
+  font-size: 1.05rem;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+.driver-assign-option:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: var(--highlight);
+}
+.driver-assign-option.selected {
+  background: rgba(233, 69, 96, 0.2);
+  border-color: var(--highlight);
+}
+
+/* Admin - 스탑 목록 지도 크게 보기 */
+.route-map-wrapper {
+  position: relative;
+  cursor: pointer;
+  margin-bottom: 1rem;
+}
+.route-map-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.3);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.route-map-wrapper:hover .route-map-overlay { opacity: 1; }
+
+.map-fullscreen-modal .modal-box { max-width: none; }
+.map-fullscreen-box {
+  width: 95vw;
+  max-width: 1200px;
+  height: 85vh;
+  max-height: 800px;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+}
+.map-fullscreen-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+.map-fullscreen-header h3 { margin: 0; }
+.route-map-fullscreen {
+  flex: 1;
+  min-height: 400px;
+  border-radius: 8px;
+  overflow: hidden;
+}
 
 /* Plan detail - 배송 세부 정보 */
 .plan-detail-header {

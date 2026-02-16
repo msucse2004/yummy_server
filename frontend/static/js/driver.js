@@ -74,6 +74,25 @@ function getLocalDateString() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function getNextStop(stops) {
+  const list = (stops || []).filter(s => !s.is_completed).sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+  return list[0] || null;
+}
+
+function itemsStr(s) {
+  const arr = (s.order_items || []).map(oi => `${oi.item?.product || ''} x${oi.quantity}`).filter(Boolean);
+  return arr.length ? arr.join(', ') : '-';
+}
+
+function escapeHtml(str) {
+  return String(str || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function toggleStopCard(stopId) {
+  const el = document.getElementById('stop-' + stopId);
+  if (el) el.classList.toggle('expanded');
+}
+
 async function loadPlans() {
   const today = getLocalDateString();
   const plans = await api.plans.list(today, today);
@@ -127,21 +146,52 @@ async function showRoute(route, planId, title) {
   document.getElementById('routeSection').style.display = 'block';
 }
 
+function renderRouteContext(stops) {
+  const next = getNextStop(stops || []);
+  const ctx = document.getElementById('routeContext');
+  if (!ctx) return;
+  if (next) {
+    const c = next.customer || {};
+    ctx.innerHTML = `
+      <h3 style="margin:0 0 0.5rem">다음 목적지</h3>
+      <p style="margin:0.25rem 0;font-weight:600">#${next.sequence} ${escapeHtml(c.name || '거래처')}</p>
+      <p style="color:var(--muted);font-size:0.9rem;margin:0.25rem 0">${escapeHtml(c.address || '-')}</p>
+      <p style="margin:0.5rem 0;font-size:0.95rem">${escapeHtml(itemsStr(next))}</p>
+      <p style="margin:0.5rem 0 0"><button class="btn btn-primary" onclick="completeStop(${next.id})">완료 처리</button></p>
+    `;
+  } else {
+    ctx.innerHTML = '<p style="margin:0;color:var(--highlight)">오늘 배달 완료</p>';
+  }
+}
+
+function renderStopCard(s) {
+  const name = escapeHtml(s.customer?.name || '거래처');
+  const statusTxt = s.is_completed ? '<span style="color:green">완료</span>' : '<span style="color:var(--muted)">배송전</span>';
+  const bodyHtml = `
+    <p style="margin:0.25rem 0;color:var(--muted);font-size:0.9rem">${escapeHtml((s.customer?.address || '')) || '-'}</p>
+    <p style="margin:0.5rem 0">${escapeHtml(itemsStr(s))}</p>
+    <p style="margin:0.5rem 0 0">
+      ${s.is_completed ? '<span style="color:green">완료됨</span>' : '<button class="btn btn-primary" onclick="completeStop(' + s.id + ')">완료 처리</button>'}
+    </p>
+  `;
+  return `
+    <div class="stop-card" id="stop-${s.id}">
+      <div class="stop-card-header" onclick="toggleStopCard(${s.id})">
+        <span class="stop-summary">#${s.sequence} ${name}</span>
+        <span>${statusTxt}</span>
+        <span class="toggle-icon">▼</span>
+      </div>
+      <div class="stop-card-body">${bodyHtml}</div>
+    </div>
+  `;
+}
+
 async function loadStops(routeId, planId) {
   window._currentRouteId = routeId;
   window._currentPlanId = planId;
   const stops = await api.stops.listByRoute(routeId);
-  const itemsStr = (s) => {
-    const arr = (s.order_items || []).map(oi => `${oi.item?.product || ''} x${oi.quantity}`).filter(Boolean);
-    return arr.length ? arr.join(', ') : '-';
-  };
-  document.getElementById('stopsList').innerHTML = stops.map(s => `
-    <div class="card" id="stop-${s.id}">
-      <h3>#${s.sequence} ${(s.customer?.name || '거래처').replace(/</g, '&lt;')}</h3>
-      <p>${itemsStr(s).replace(/</g, '&lt;')}</p>
-      <p>${s.is_completed ? '<span style="color:green">완료됨</span>' : '<button class="btn btn-primary" onclick="completeStop(' + s.id + ')">완료 처리</button>'}</p>
-    </div>
-  `).join('');
+  renderRouteContext(stops);
+  document.getElementById('stopsList').innerHTML = stops.map(s => renderStopCard(s)).join('');
 }
 
 async function completeStop(stopId) {

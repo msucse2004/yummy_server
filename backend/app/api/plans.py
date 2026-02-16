@@ -43,8 +43,8 @@ def _get_plan_delivery_status(db: Session, plan_id: int) -> str:
     return f"배송중({completed}/{total})"
 
 
-def _get_route_delivery_status(db: Session, route_id: int) -> str:
-    """단일 루트의 배송 상태: 배송전 / 배송중(k/n) / 배송완료"""
+def _get_route_delivery_status(db: Session, route_id: int, route: Route | None = None) -> str:
+    """단일 루트의 배송 상태: 배송전 / 배송시작 / 배송중(k/n) / 배송완료"""
     total = db.execute(
         select(func.count(Stop.id)).select_from(Stop).where(Stop.route_id == route_id)
     ).scalar() or 0
@@ -57,6 +57,9 @@ def _get_route_delivery_status(db: Session, route_id: int) -> str:
         .where(Stop.route_id == route_id)
     ).scalar() or 0
     if completed == 0:
+        r = route or db.get(Route, route_id)
+        if r and r.started_at:
+            return "배송시작"
         return "배송전"
     if completed >= total:
         return "배송완료"
@@ -66,19 +69,16 @@ def _get_route_delivery_status(db: Session, route_id: int) -> str:
 def _get_plan_route_delivery_statuses(db: Session, plan_id: int) -> str:
     """플랜의 루트별 배송상태 문자열: 1호차: 배송전, 2호차: 배송중(1/N), 3호차: 배송완료"""
     routes = list(
-        db.execute(
-            select(Route.id, Route.name)
-            .select_from(Route)
-            .where(Route.plan_id == plan_id)
-            .order_by(Route.sequence.asc(), Route.id.asc())
+        db.scalars(
+            select(Route).where(Route.plan_id == plan_id).order_by(Route.sequence.asc(), Route.id.asc())
         ).all()
     )
     if not routes:
         return _get_plan_delivery_status(db, plan_id)
     parts = []
-    for route_id, route_name in routes:
-        label = (route_name or str(route_id)).strip() or f"루트{route_id}"
-        status = _get_route_delivery_status(db, route_id)
+    for route in routes:
+        label = (route.name or str(route.id)).strip() or f"루트{route.id}"
+        status = _get_route_delivery_status(db, route.id, route)
         parts.append(f"{label}: {status}")
     return ", ".join(parts)
 
@@ -473,7 +473,7 @@ def get_plan_detail(
             {"driver_id": a.driver_id, "driver_name": (a.driver.display_name or a.driver.username) if a.driver else ""}
             for a in r.assignments
         ]
-        route_status = _get_route_delivery_status(db, r.id)
+        route_status = _get_route_delivery_status(db, r.id, r)
         routes_data.append(
             RouteWithAssignment(
                 id=r.id,

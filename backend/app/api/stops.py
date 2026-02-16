@@ -128,6 +128,25 @@ def _calc_receipt_line(quantity: float, unit_price: float | None) -> tuple[int, 
     return supply, tax
 
 
+def calc_stop_total(stop: Stop) -> int:
+    """스탑 주문 총액 (공급가+세액) - 배송 완료 시 미수금 반영용"""
+    total = 0
+    for oi in stop.order_items:
+        item = oi.item if oi else None
+        if item:
+            supply, tax = _calc_receipt_line(float(oi.quantity), item.unit_price)
+            total += supply + tax
+    return total
+
+
+def add_arrears_for_completed_stop(db: Session, stop: Stop) -> None:
+    """배송 완료 시 거래처 미수금에 스탑 금액 반영"""
+    total = calc_stop_total(stop)
+    if total > 0 and stop.customer_id and stop.customer:
+        prev = int(stop.customer.arrears or 0)
+        stop.customer.arrears = prev + total
+
+
 class ReceiptItemRow(BaseModel):
     product_spec: str  # 품목(규격) - 코드 상품명 등
     unit: str = ""

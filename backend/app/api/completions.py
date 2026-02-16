@@ -5,11 +5,12 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session, joinedload
 
+from app.api.stops import add_arrears_for_completed_stop
 from app.config import get_settings
 from app.core.auth import require_user
 from app.core.route_access import require_route_access
 from app.database import get_db
-from app.models import User, Stop, StopCompletion, Photo, Route
+from app.models import User, Stop, StopCompletion, Photo, Route, StopOrderItem
 from app.schemas.completion import CompletionCreate, CompletionResponse, PhotoResponse
 
 router = APIRouter(prefix="/api/completions", tags=["completions"])
@@ -21,6 +22,8 @@ def _get_stop_with_route(db: Session, stop_id: int) -> Stop | None:
         stop_id,
         options=[
             joinedload(Stop.route).joinedload(Route.assignments),
+            joinedload(Stop.order_items).joinedload(StopOrderItem.item),
+            joinedload(Stop.customer),
             joinedload(Stop.completions).joinedload(StopCompletion.photos),
         ],
     )
@@ -46,6 +49,7 @@ async def complete_stop(
         memo=memo,
     )
     db.add(completion)
+    add_arrears_for_completed_stop(db, stop)
     db.commit()
     db.refresh(completion)
     return completion
