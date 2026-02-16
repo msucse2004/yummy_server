@@ -5,18 +5,107 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import distinct, func, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.auth import require_user, require_role
 from app.database import get_db
-from app.models import User, Plan, Route, RouteAssignment, Stop, StopOrderItem, Item, Customer
+from app.models import User, Plan, Route, RouteAssignment, Stop, StopOrderItem, Item, Customer, StopCompletion
 from app.models.user import Role
 from app.schemas.plan import PlanCreate, PlanListResponse, PlanUpdate, PlanResponse
 from app.services.contract_match import contract_items_to_display_string, match_contract_content
 
 router = APIRouter(prefix="/api/plans", tags=["plans"])
 RequireAdmin = Depends(require_role(Role.ADMIN))
+
+
+def _get_plan_delivery_status(db: Session, plan_id: int) -> str:
+    """플랜의 배송 상태: 배송전 / 배송중(k/n) / 배송완료"""
+    total = db.execute(
+        select(func.count(Stop.id))
+        .select_from(Stop)
+        .join(Route, Stop.route_id == Route.id)
+        .where(Route.plan_id == plan_id)
+    ).scalar() or 0
+    if total == 0:
+        return "배송전"
+    completed = db.execute(
+        select(func.count(distinct(Stop.id)))
+        .select_from(Stop)
+        .join(Route, Stop.route_id == Route.id)
+        .join(StopCompletion, Stop.id == StopCompletion.stop_id)
+        .where(Route.plan_id == plan_id)
+    ).scalar() or 0
+    if completed == 0:
+        return "배송전"
+    if completed >= total:
+        return "배송완료"
+    return f"배송중({completed}/{total})"
+
+
+def _get_route_delivery_status(db: Session, route_id: int) -> str:
+    """단일 루트의 배송 상태: 배송전 / 배송중(k/n) / 배송완료"""
+    total = db.execute(
+        select(func.count(Stop.id)).select_from(Stop).where(Stop.route_id == route_id)
+    ).scalar() or 0
+    if total == 0:
+        return "배송전"
+    completed = db.execute(
+        select(func.count(distinct(Stop.id)))
+        .select_from(Stop)
+        .join(StopCompletion, Stop.id == StopCompletion.stop_id)
+        .where(Stop.route_id == route_id)
+    ).scalar() or 0
+    if completed == 0:
+        return "배송전"
+    if completed >= total:
+        return "배송완료"
+    return f"배송중({completed}/{total})"
+
+
+def _get_plan_route_delivery_statuses(db: Session, plan_id: int) -> str:
+    """플랜의 루트별 배송상태 문자열: 1호차: 배송전, 2호차: 배송중(1/N), 3호차: 배송완료"""
+    routes = list(
+        db.execute(
+            select(Route.id, Route.name)
+            .select_from(Route)
+            .where(Route.plan_id == plan_id)
+            .order_by(Route.sequence.asc(), Route.id.asc())
+        ).all()
+    )
+    if not routes:
+        return _get_plan_delivery_status(db, plan_id)
+    parts = []
+    for route_id, route_name in routes:
+        label = (route_name or str(route_id)).strip() or f"루트{route_id}"
+        status = _get_route_delivery_status(db, route_id)
+        parts.append(f"{label}: {status}")
+    return ", ".join(parts)
+
+
+def _auto_assign_drivers_by_department(db: Session, plan_id: int) -> None:
+    """부서(루트명) 매칭으로 기사 자동 배정. 배정 없는 루트만 채움."""
+    plan = db.get(
+        Plan,
+        plan_id,
+        options=[joinedload(Plan.routes).joinedload(Route.assignments)],
+    )
+    if not plan:
+        return
+    drivers_by_dept: dict[str, list[User]] = defaultdict(list)
+    for u in db.execute(
+        select(User).where(User.role == Role.DRIVER, User.status == "재직")
+    ).scalars().all():
+        if u.department and str(u.department).strip():
+            drivers_by_dept[str(u.department).strip()].append(u)
+    for route in plan.routes:
+        if route.assignments:
+            continue
+        route_name = (route.name or "").strip()
+        candidates = drivers_by_dept.get(route_name) if route_name else None
+        if candidates:
+            db.add(RouteAssignment(route_id=route.id, driver_id=candidates[0].id))
+    db.flush()
 
 
 def _get_plan_delivery_summary(db: Session, plan_id: int) -> tuple[str, int]:
@@ -61,6 +150,7 @@ def list_plans(
     result = []
     for p in plans:
         delivery_qty, daily_sales = _get_plan_delivery_summary(db, p.id)
+        delivery_status = _get_plan_route_delivery_statuses(db, p.id)
         result.append(
             PlanListResponse(
                 id=p.id,
@@ -70,6 +160,7 @@ def list_plans(
                 memo=p.memo,
                 delivery_quantity=delivery_qty,
                 daily_sales=daily_sales,
+                delivery_status=delivery_status,
             )
         )
     return result
@@ -305,12 +396,13 @@ def create_plan_from_list(
 
 
 class RouteWithAssignment(BaseModel):
-    """루트 + 배정 기사 정보 (플랜 상세용)"""
+    """루트 + 배정 기사 정보 + 배송상태 (플랜 상세용)"""
     id: int
     plan_id: int
     name: str
     sequence: int
     assignments: list[dict] = []
+    delivery_status: str = ""
     model_config = {"from_attributes": True}
 
 
@@ -324,10 +416,14 @@ class PlanDetailResponse(BaseModel):
 @router.get("/{plan_id}/plan-detail", response_model=PlanDetailResponse)
 def get_plan_detail(
     plan_id: int,
+    auto_assign: bool = Query(True, description="배정 없는 루트에 부서 매칭으로 기사 자동 배정"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_user),
 ):
-    """관리자 플랜 상세 - 루트별 기사 배정, 이전날 기사 디폴트 포함"""
+    """관리자 플랜 상세 - 루트별 기사 배정, 이전날 기사 디폴트, 배송상태 포함"""
+    if current_user.role == Role.ADMIN and auto_assign:
+        _auto_assign_drivers_by_department(db, plan_id)
+        db.commit()
     plan = db.get(
         Plan,
         plan_id,
@@ -377,6 +473,7 @@ def get_plan_detail(
             {"driver_id": a.driver_id, "driver_name": (a.driver.display_name or a.driver.username) if a.driver else ""}
             for a in r.assignments
         ]
+        route_status = _get_route_delivery_status(db, r.id)
         routes_data.append(
             RouteWithAssignment(
                 id=r.id,
@@ -384,6 +481,7 @@ def get_plan_detail(
                 name=r.name,
                 sequence=r.sequence,
                 assignments=assignments,
+                delivery_status=route_status,
             )
         )
 

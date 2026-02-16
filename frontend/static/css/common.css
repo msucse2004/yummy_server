@@ -256,6 +256,25 @@ table a:hover {
 
 .card h2 { margin: 0 0 0.75rem; font-size: 1.1rem; }
 
+/* Plan detail - 배송 세부 정보 */
+.plan-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.plan-detail-header h2 { margin: 0; font-size: 1.25rem; }
+.plan-status-badge {
+  padding: 0.35rem 0.9rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.plan-status-pending { background: #6b7280; color: #fff; }
+.plan-status-progress { background: #3b82f6; color: #fff; }
+.plan-status-done { background: #22c55e; color: #fff; }
+
 /* Forms */
 .form-group { margin-bottom: 1rem; }
 .form-group label { display: block; margin-bottom: 0.35rem; color: var(--muted); font-size: 0.9rem; }

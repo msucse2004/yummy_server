@@ -4,9 +4,10 @@ from pydantic import BaseModel, Field
 
 
 class PlanListExtra(BaseModel):
-    """목록용 추가 필드: 배달 수량, 일일매출"""
+    """목록용 추가 필드: 배달 수량, 일일매출, 배송상태"""
     delivery_quantity: str = ""
     daily_sales: int = 0
+    delivery_status: str = ""  # 배송전 | 배송중(k/n) | 배송완료
 
 
 class PlanBase(BaseModel):

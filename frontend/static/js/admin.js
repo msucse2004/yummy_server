@@ -99,6 +99,7 @@ function renderPlans() {
       <td>${p.plan_date || '-'}</td>
       <td>${p.delivery_quantity || '-'}</td>
       <td>${p.daily_sales != null && p.daily_sales > 0 ? p.daily_sales.toLocaleString('ko-KR') + '원' : '-'}</td>
+      <td>${p.delivery_status || '-'}</td>
       <td class="plan-actions" onclick="event.stopPropagation()">
         <button type="button" class="btn btn-secondary" onclick="showPlanEditModal(${p.id})">수정</button>
         <button type="button" class="btn btn-secondary" onclick="deletePlan(${p.id})">삭제</button>
@@ -226,14 +227,18 @@ async function openPlan(planId) {
   const { plan, routes, previous_day_drivers } = detail;
   const drivers = users.filter(u => u.role === 'DRIVER');
   const html = `
-    <h2>${plan.route || '-'} - ${plan.name}</h2>
+    <div class="plan-detail-header">
+      <h2>${plan.route || '-'} - ${plan.name}</h2>
+    </div>
     ${routes.map(r => {
       const currentDriver = r.assignments?.[0];
       const prevDriver = previous_day_drivers?.[r.name];
       const defaultId = (currentDriver?.driver_id) || (prevDriver?.driver_id) || '';
+      const statusText = r.delivery_status || '배송전';
+      const statusClass = statusText === '배송완료' ? 'plan-status-done' : statusText.startsWith('배송중') ? 'plan-status-progress' : 'plan-status-pending';
       return `
       <div class="card">
-        <h3>${r.name}</h3>
+        <h3>${r.name} <span class="plan-status-badge ${statusClass}">${statusText}</span></h3>
         <p>기사 배정: <select onchange="assignDriver(${r.id}, this.value, ${planId})">
           <option value="">-</option>
           ${drivers.map(u => `<option value="${u.id}" ${defaultId === u.id ? 'selected' : ''}>${u.display_name || u.username}</option>`).join('')}
@@ -241,7 +246,7 @@ async function openPlan(planId) {
         <p><a href="#" onclick="event.preventDefault();openRoute(${r.id}, ${planId})">스탑 목록</a></p>
       </div>
     `}).join('')}
-    <p><button onclick="document.getElementById('planDetail').style.display='none'; loadPlans();">닫기</button></p>
+    <p><button class="btn btn-secondary" onclick="openPlan(${planId})">새로고침</button> <button class="btn btn-secondary" onclick="document.getElementById('planDetail').style.display='none'; loadPlans();">닫기</button></p>
   `;
   document.getElementById('planDetail').innerHTML = html;
   document.getElementById('planDetail').dataset.planId = planId;
@@ -288,8 +293,11 @@ async function openRoute(routeId, planId) {
     : `<p class="route-map-placeholder">배송지 좌표가 있는 곳만 경로에 표시됩니다.</p>`;
   window._routeCompanyLoc = companyLoc;
   window._routeStopsData = { stops, routeId, planId };
+  const totalStops = stops.length;
+  const completedCount = stops.filter(s => s.is_completed).length;
+  const routeStatus = totalStops === 0 ? '배송전' : completedCount === 0 ? '배송전' : completedCount >= totalStops ? '배송완료' : `배송중(${completedCount}/${totalStops})`;
   const html = `
-    <h3>스탑 목록</h3>
+    <h3>스탑 목록 <span style="font-weight:normal; color:var(--muted); font-size:0.9em">${routeStatus}</span></h3>
     <p>${mapHtml}</p>
     <table class="stops-draggable-table"><thead><tr><th>순서</th><th>거래처</th><th>품목</th><th>영수증 보기</th><th>배송상태</th></tr></thead>
     <tbody>
@@ -316,22 +324,23 @@ async function openRoute(routeId, planId) {
     `}).join('')}
     </tbody></table>
     <p><small style="color:var(--muted)">드래그하여 순서 변경</small></p>
-    <p><button onclick="openPlan(${planId})">뒤로</button></p>
+    <p><button class="btn btn-secondary" onclick="openRoute(${routeId}, ${planId})">새로고침</button> <button class="btn btn-secondary" onclick="openPlan(${planId})">뒤로</button></p>
   `;
   document.getElementById('planDetail').innerHTML = html;
   bindStopRowDragDrop(routeId, planId);
   if (hasMap && typeof L !== 'undefined') {
-    setTimeout(() => initRouteMap(pointsWithCoords, window._routeCompanyLoc), 50);
+    setTimeout(() => initRouteMap(pointsWithCoords, window._routeCompanyLoc, stops), 50);
   }
 }
 
-function initRouteMap(stops, companyLoc) {
+function initRouteMap(pointsWithCoords, companyLoc, allStops) {
   const mapEl = document.getElementById('routeMap');
   if (!mapEl) return;
   if (window._routeMap) {
     window._routeMap.remove();
     window._routeMap = null;
   }
+  const stops = pointsWithCoords || [];
   const pts = stops.map(s => [parseFloat(s.lat), parseFloat(s.lng)]);
   const origin = (companyLoc?.latitude != null && companyLoc?.longitude != null)
     ? [parseFloat(companyLoc.latitude), parseFloat(companyLoc.longitude)] : null;
@@ -355,7 +364,8 @@ function initRouteMap(stops, companyLoc) {
     const s = stops[i];
     const ord = s.displayOrder || (i + 1);
     const itemsStr = (s.order_items || []).map(oi => formatOrderItem(oi)).filter(Boolean).join(', ') || '-';
-    const popupHtml = `<b>${ord}. ${s.customer?.name || ''}</b><br>${itemsStr ? `배달 품목: ${itemsStr}` : '배달 품목 없음'}`;
+    const statusBadge = s.is_completed ? '<span style="color:green">완료</span>' : '';
+    const popupHtml = `<b>${ord}. ${s.customer?.name || ''}</b> ${statusBadge}<br>${itemsStr ? `배달 품목: ${itemsStr}` : '배달 품목 없음'}`;
     L.marker(p, {
       icon: L.divIcon({
         className: 'route-marker-number',
@@ -367,6 +377,26 @@ function initRouteMap(stops, companyLoc) {
   });
   if (allPts.length > 1) {
     L.polyline(allPts, { color: '#4a90d9', weight: 3 }).addTo(map);
+    const completedWithCoords = stops.filter(s => s.is_completed).length;
+    const totalWithCoords = stops.length;
+    let driverPos = null;
+    if (completedWithCoords === 0) {
+      driverPos = origin ? [parseFloat(origin[0]), parseFloat(origin[1])] : null;
+    } else if (completedWithCoords < totalWithCoords) {
+      const fromPt = allPts[completedWithCoords];
+      const toPt = allPts[completedWithCoords + 1] || fromPt;
+      driverPos = [(fromPt[0] + toPt[0]) / 2, (fromPt[1] + toPt[1]) / 2];
+    }
+    if (driverPos) {
+      L.marker(driverPos, {
+        icon: L.divIcon({
+          className: 'route-marker-driver',
+          html: '<span style="font-size:20px" title="기사 위치">🚚</span>',
+          iconSize: [32, 32],
+          iconAnchor: [16, 16],
+        }),
+      }).addTo(map).bindPopup('<b>기사 위치</b> (추정)');
+    }
     map.fitBounds(allPts);
   }
   window._routeMap = map;
