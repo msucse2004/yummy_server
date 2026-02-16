@@ -9,7 +9,7 @@ from app.logging_config import configure_logging
 configure_logging(os.getenv("LOG_LEVEL", "INFO"))
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, customers, items, plans, routes, stops, completions, users, uploads, reports, settings as settings_api
+from app.api import auth, config as config_api, customers, items, plans, routes, stops, completions, users, uploads, reports, settings as settings_api
 from app.config import get_settings
 
 settings = get_settings()
@@ -37,6 +37,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(config_api.router)
 app.include_router(customers.router)
 app.include_router(items.router)
 app.include_router(plans.router)

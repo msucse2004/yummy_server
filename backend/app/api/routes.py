@@ -1,4 +1,6 @@
 """루트 CRUD - ADMIN 관리, DRIVER는 배정된 루트만"""
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
@@ -118,6 +120,21 @@ def set_route_driver(
     db.execute(delete(RouteAssignment).where(RouteAssignment.route_id == route_id))
     if data and data.driver_id:
         db.add(RouteAssignment(route_id=route_id, driver_id=data.driver_id))
+    db.commit()
+
+
+@router.post("/{route_id}/start", status_code=status.HTTP_204_NO_CONTENT)
+def start_route(
+    route_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """배송 시작 - 배정된 기사만 호출 가능. routes.started_at 갱신."""
+    route = _get_route_with_assignments(db, route_id)
+    if not route:
+        raise HTTPException(status_code=404, detail="루트를 찾을 수 없습니다")
+    require_route_access(current_user, route)
+    route.started_at = datetime.now(timezone.utc)
     db.commit()
 
 

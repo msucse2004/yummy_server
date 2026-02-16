@@ -278,11 +278,15 @@ function formatOrderItem(oi) {
 }
 
 async function openRoute(routeId, planId) {
-  const [stops, companyLoc, settings] = await Promise.all([
+  const [stops, route, companyLoc, settings] = await Promise.all([
     api.stops.listByRoute(routeId),
+    api.routes.get(routeId).catch(() => ({ started_at: null })),
     api.settings.getCompanyLocation().catch(() => ({ latitude: null, longitude: null })),
     api.settings.get().catch(() => ({ company_address: '' })),
   ]);
+  const routeStarted = !!(route?.started_at);
+  const sortedStops = [...stops].sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+  const firstUncompletedIdx = sortedStops.findIndex(s => !s.is_completed);
   const companyAddr = settings?.company_address || '(회사 주소 미설정)';
   const pointsWithCoords = stops
     .map((s, i) => ({ ...s, displayOrder: i + 1, lat: s.customer?.latitude, lng: s.customer?.longitude }))
@@ -293,9 +297,10 @@ async function openRoute(routeId, planId) {
     : `<p class="route-map-placeholder">배송지 좌표가 있는 곳만 경로에 표시됩니다.</p>`;
   window._routeCompanyLoc = companyLoc;
   window._routeStopsData = { stops, routeId, planId };
+  window._routeMapData = { pointsWithCoords, companyLoc, stops, route };
   const totalStops = stops.length;
   const completedCount = stops.filter(s => s.is_completed).length;
-  const routeStatus = totalStops === 0 ? '배송전' : completedCount === 0 ? '배송전' : completedCount >= totalStops ? '배송완료' : `배송중(${completedCount}/${totalStops})`;
+  const routeStatus = totalStops === 0 ? '배송전' : completedCount === 0 ? (routeStarted ? '배송시작' : '배송전') : completedCount >= totalStops ? '배송완료' : `배송중(${completedCount}/${totalStops})`;
   const html = `
     <h3>스탑 목록 <span style="font-weight:normal; color:var(--muted); font-size:0.9em">${routeStatus}</span></h3>
     <p>${mapHtml}</p>
@@ -312,7 +317,8 @@ async function openRoute(routeId, planId) {
         `<a href="${receiptUrl}" target="_blank">거래명세표</a>`,
         ...photos.map(p => `<a href="/api/uploads/photo/${p.id}" target="_blank">사진</a>`)
       ].join(' ');
-      const statusText = s.is_completed ? '배송완료' : '배송전';
+      const isFirstUncompleted = routeStarted && firstUncompletedIdx >= 0 && sortedStops[firstUncompletedIdx]?.id === s.id;
+      const statusText = s.is_completed ? '배송완료' : isFirstUncompleted ? '배송중' : '배송전';
       return `
       <tr class="stop-row-draggable" draggable="true" data-stop-id="${s.id}">
         <td>${order}</td>
@@ -329,16 +335,19 @@ async function openRoute(routeId, planId) {
   document.getElementById('planDetail').innerHTML = html;
   bindStopRowDragDrop(routeId, planId);
   if (hasMap && typeof L !== 'undefined') {
-    setTimeout(() => initRouteMap(pointsWithCoords, window._routeCompanyLoc, stops), 50);
+    setTimeout(() => initRouteMap(pointsWithCoords, window._routeCompanyLoc, stops, null, route), 50);
   }
 }
 
-function initRouteMap(pointsWithCoords, companyLoc, allStops) {
-  const mapEl = document.getElementById('routeMap');
+function initRouteMap(pointsWithCoords, companyLoc, allStops, containerId, route) {
+  const id = containerId || 'routeMap';
+  const mapEl = document.getElementById(id);
   if (!mapEl) return;
-  if (window._routeMap) {
-    window._routeMap.remove();
-    window._routeMap = null;
+  const existingMap = id === 'routeMap' ? window._routeMap : window._routeMapFullscreen;
+  if (existingMap) {
+    existingMap.remove();
+    if (id === 'routeMap') window._routeMap = null;
+    else window._routeMapFullscreen = null;
   }
   const stops = pointsWithCoords || [];
   const pts = stops.map(s => [parseFloat(s.lat), parseFloat(s.lng)]);
@@ -346,7 +355,7 @@ function initRouteMap(pointsWithCoords, companyLoc, allStops) {
     ? [parseFloat(companyLoc.latitude), parseFloat(companyLoc.longitude)] : null;
   const allPts = origin ? [origin, ...pts] : pts;
   const center = allPts.length ? allPts[Math.floor(allPts.length / 2)] : [37.5665, 126.978];
-  const map = L.map('routeMap').setView(center, 12);
+  const map = L.map(id).setView(center, 12);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
   }).addTo(map);
@@ -379,8 +388,13 @@ function initRouteMap(pointsWithCoords, companyLoc, allStops) {
     L.polyline(allPts, { color: '#4a90d9', weight: 3 }).addTo(map);
     const completedWithCoords = stops.filter(s => s.is_completed).length;
     const totalWithCoords = stops.length;
+    const routeStarted = !!(route?.started_at);
     let driverPos = null;
-    if (completedWithCoords === 0) {
+    if (completedWithCoords === 0 && routeStarted && allPts.length >= 2) {
+      const fromPt = allPts[0];
+      const toPt = allPts[1];
+      driverPos = [(fromPt[0] + toPt[0]) / 2, (fromPt[1] + toPt[1]) / 2];
+    } else if (completedWithCoords === 0) {
       driverPos = origin ? [parseFloat(origin[0]), parseFloat(origin[1])] : null;
     } else if (completedWithCoords < totalWithCoords) {
       const fromPt = allPts[completedWithCoords];
@@ -399,7 +413,11 @@ function initRouteMap(pointsWithCoords, companyLoc, allStops) {
     }
     map.fitBounds(allPts);
   }
-  window._routeMap = map;
+  if (id === 'routeMap') {
+    window._routeMap = map;
+  } else {
+    window._routeMapFullscreen = map;
+  }
 }
 
 function bindStopRowDragDrop(routeId, planId) {

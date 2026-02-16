@@ -15,6 +15,9 @@ async function fetchApi(path, options = {}) {
 }
 
 const api = {
+  config: {
+    client: () => fetchApi('/config/client'),
+  },
   async checkUsername(username) {
     const res = await fetch(API_BASE + '/auth/check-username?' + new URLSearchParams({ username: (username || '').trim() }), {
       credentials: 'include',
@@ -104,6 +107,13 @@ const api = {
   },
   routes: {
     listByPlan: (planId) => fetchApi(`/routes/plan/${planId}`),
+    get: (routeId) => fetchApi(`/routes/${routeId}`),
+    start: (routeId) => fetch(API_BASE + `/routes/${routeId}/start`, {
+      method: 'POST',
+      credentials: 'include',
+    }).then(r => {
+      if (!r.ok) return r.json().then(d => { throw { detail: d.detail || r.statusText }; });
+    }),
     create: (planId, d) => fetchApi(`/routes/plan/${planId}`, { method: 'POST', body: JSON.stringify(d) }),
     assign: (routeId, driverId) => fetch(API_BASE + `/routes/${routeId}/assign`, {
       method: 'POST', credentials: 'include',
@@ -131,10 +141,15 @@ const api = {
   completions: {
     complete: (stopId, memo) => {
       const fd = new FormData();
-      if (memo) fd.append('memo', memo);
+      fd.append('memo', memo ?? '');
       return fetch(API_BASE + `/completions/stop/${stopId}`, {
         method: 'POST', credentials: 'include', body: fd,
-      }).then(r => r.json());
+      }).then(async (r) => {
+        const text = await r.text();
+        const data = text ? (() => { try { return JSON.parse(text); } catch { return {}; } })() : {};
+        if (!r.ok) throw { detail: data?.detail || r.statusText };
+        return data;
+      });
     },
     uploadPhotos: (stopId, files) => {
       const fd = new FormData();

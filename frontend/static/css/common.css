@@ -383,3 +383,30 @@ table a:hover {
 .new-plan-table th { text-align: left; padding: 0.5rem; }
 .new-plan-table td { padding: 0.5rem; }
 .new-plan-table input[type="text"] { width: 100%; }
+
+/* Map panel - 드라이버 지도 모달 */
+.map-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+}
+.map-panel-header {
+  flex-shrink: 0;
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--card);
+  border-bottom: 1px solid var(--accent);
+}
+.map-panel-header .btn { flex: 1; }
+#mapContainer {
+  flex: 1;
+  min-height: 200px;
+}
+#mapContainer .leaflet-container { height: 100%; }
+
+#stopsListToggleWrap { margin: 0.75rem 0; }
+#stopsListToggleWrap .btn { margin-bottom: 0.5rem; }

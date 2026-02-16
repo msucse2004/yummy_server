@@ -26,6 +26,8 @@ class StopOrderItemCreate(StopOrderItemBase):
 class CustomerSummary(BaseModel):
     id: int
     name: str
+    address: str | None = None
+    phone: str | None = None
     latitude: float | None = None
     longitude: float | None = None
     model_config = {"from_attributes": True}

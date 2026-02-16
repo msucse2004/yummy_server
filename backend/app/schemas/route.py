@@ -1,4 +1,6 @@
 """루트 스키마"""
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -28,5 +30,6 @@ class RouteAssignmentSet(BaseModel):
 class RouteResponse(RouteBase):
     id: int
     plan_id: int
+    started_at: datetime | None = None
 
     model_config = {"from_attributes": True}

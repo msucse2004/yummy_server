@@ -30,6 +30,7 @@ services:
       COOKIE_DOMAIN: ${COOKIE_DOMAIN:-localhost}
       UPLOAD_DIR: /app/uploads
       KAKAO_REST_API_KEY: ${KAKAO_REST_API_KEY:-}
+      KAKAO_JAVASCRIPT_KEY: ${KAKAO_JAVASCRIPT_KEY:-}
     volumes:
       - uploads_data:/app/uploads
     expose:
