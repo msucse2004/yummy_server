@@ -2,6 +2,14 @@
 
 로컬 공장 PC에서 24/7 구동되는 배송/물류 관리 서버입니다.
 
+## 주요 기능
+
+- **배송 플랜**: 날짜별 배송 계획, 루트/기사 배정, 스탑 순서 관리 (드래그)
+- **거래명세표**: 스탑별 거래명세표 보기/인쇄 (공급자·공급받는자 보관용 2장)
+- **거래처**: 미수금액, 사업자번호, 업태/종목, 주소 Geocoding (Kakao)
+- **스탑 지도**: Leaflet 경로 지도, 순서 번호 핀
+- **설정**: 회사정보, 은행계좌 (거래명세표에 표시)
+
 ## 스택
 
 - **Backend**: FastAPI + SQLAlchemy + Alembic + PostgreSQL
@@ -75,11 +83,16 @@ docker compose exec backend python scripts/init_db.py
 | | GET /api/auth/me | 현재 사용자 |
 | | POST /api/auth/logout | 로그아웃 |
 | 거래처 | GET/POST /api/customers | 목록/생성 (ADMIN) |
+| | GET /api/customers/export/excel | Excel 내보내기 |
+| | POST /api/customers/import/excel | Excel 가져오기 |
 | 품목 | GET/POST /api/items | 목록/생성 (ADMIN) |
 | 플랜 | GET/POST /api/plans | 목록/생성 |
 | 루트 | GET /api/routes/plan/{id} | 플랜별 루트 |
 | 스탑 | GET /api/stops/route/{id} | 루트별 스탑 |
+| | GET /api/stops/{id}/receipt | 거래명세표 데이터 |
+| | PUT /api/stops/route/{id}/reorder | 스탑 순서 변경 |
 | 완료 | POST /api/completions/stop/{id} | 스탑 완료 (DRIVER) |
+| 설정 | GET/PATCH /api/settings | 회사정보, 은행계좌 (ADMIN) |
 | 리포트 | GET /api/reports/monthly/pdf | 월말 PDF (ADMIN) |
 
 ## 보안
@@ -107,6 +120,15 @@ export DATABASE_URL=postgresql://yummy:yummy_secret@localhost:5432/yummy
 pytest tests/ -v
 ```
 
+## 프론트엔드 화면
+
+| 경로 | 설명 |
+|------|------|
+| / | 로그인 |
+| /admin.html | 관리자: 플랜, 거래처, 품목, 사용자, 설정 |
+| /driver.html | 기사: 배정 루트, 스탑 완료 |
+| /receipt.html?stop_id={id} | 거래명세표 보기/인쇄 |
+
 ## 디렉터리 구조
 
 ```
@@ -117,10 +139,14 @@ yummy_server/
 │   │   ├── core/        # auth, security
 │   │   ├── models/      # SQLAlchemy 모델
 │   │   ├── schemas/     # Pydantic
-│   │   └── services/    # 리포트 등
+│   │   └── services/    # contract_match, 리포트 등
 │   ├── alembic/
 │   └── tests/
-├── frontend/static/     # 웹 정적 파일
+├── frontend/static/     # 웹 정적 파일 (admin, driver, receipt)
 ├── scripts/             # 백업 등
 └── docker-compose.yml
 ```
+
+## 버전
+
+- **v0.3**: 거래명세표, 미수금액, 은행설정, 스탑 지도 순서 핀

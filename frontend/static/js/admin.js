@@ -21,6 +21,7 @@ document.querySelectorAll('.nav-tabs a').forEach(a => {
     document.getElementById('tab-' + tab).style.display = 'block';
     if (tab === 'plans') loadPlans();
     if (tab === 'customers') loadCustomers();
+    if (tab === 'arrears') loadArrears();
     if (tab === 'items') loadItems();
     if (tab === 'users') loadUsers();
     if (tab === 'settings') loadSettings();
@@ -486,6 +487,108 @@ async function loadCustomers() {
   renderCustomers();
   updateCustomerSortIcons();
   bindCustomerSortHandlers();
+}
+
+let arrearsSortCol = 'arrears';
+let arrearsSortAsc = false;
+
+let _partialRepayCustomerId = null;
+let _partialRepayCurrentArrears = 0;
+
+async function loadArrears() {
+  const list = await api.customers.list();
+  const filtered = list.filter(c => {
+    const amt = c.arrears != null && c.arrears !== '' ? Number(c.arrears) : 0;
+    return amt > 0;
+  });
+  const sorted = [...filtered].sort((a, b) => {
+    const av = a[arrearsSortCol];
+    const bv = b[arrearsSortCol];
+    const cmp = arrearsSortCol === 'arrears' || arrearsSortCol === 'code'
+      ? (arrearsSortCol === 'arrears' ? (Number(av) || 0) - (Number(bv) || 0) : (av || '').toString().localeCompare((bv || '').toString(), 'ko'))
+      : (av || '').toString().localeCompare((bv || '').toString(), 'ko');
+    return arrearsSortAsc ? cmp : -cmp;
+  });
+  document.getElementById('arrearsList').innerHTML = sorted.map(c => {
+    const amt = (c.arrears != null && c.arrears !== '' ? Number(c.arrears) : 0);
+    return `
+    <tr>
+      <td>${c.code || '-'}</td>
+      <td>${c.name || '-'}</td>
+      <td>${amt.toLocaleString('ko-KR')}원</td>
+      <td>
+        <button class="btn btn-secondary" onclick="fullRepayment(${c.id})" ${amt <= 0 ? 'disabled' : ''}>전액변제</button>
+        <button class="btn btn-secondary" onclick="showPartialRepayModal(${c.id}, ${amt}, ${JSON.stringify(c.name || '')})" ${amt <= 0 ? 'disabled' : ''}>부분변제</button>
+      </td>
+    </tr>
+  `}).join('');
+  updateArrearsSortIcons();
+  bindArrearsSortHandlers();
+}
+
+async function fullRepayment(customerId) {
+  if (!confirm('미수금액을 0원으로 초기화하시겠습니까?')) return;
+  try {
+    await api.customers.update(customerId, { arrears: 0 });
+    loadArrears();
+  } catch (e) {
+    alert(e?.detail || '변제 처리 실패');
+  }
+}
+
+function showPartialRepayModal(customerId, currentArrears, customerName) {
+  _partialRepayCustomerId = customerId;
+  _partialRepayCurrentArrears = Number(currentArrears) || 0;
+  document.getElementById('partialRepayCustomerName').textContent = `${customerName} (현재 미수금: ${_partialRepayCurrentArrears.toLocaleString('ko-KR')}원)`;
+  document.getElementById('partialRepayAmount').value = '';
+  document.getElementById('partialRepayCurrentArrears').textContent = `변제 후 잔액: 최대 ${_partialRepayCurrentArrears.toLocaleString('ko-KR')}원까지 변제 가능`;
+  document.getElementById('partialRepayModal').style.display = 'flex';
+}
+
+function closePartialRepayModal() {
+  document.getElementById('partialRepayModal').style.display = 'none';
+  _partialRepayCustomerId = null;
+}
+
+async function submitPartialRepay() {
+  const inp = document.getElementById('partialRepayAmount');
+  const raw = inp?.value?.trim();
+  const amount = raw ? parseInt(raw, 10) : 0;
+  if (!amount || amount <= 0) {
+    alert('변제 금액을 입력하세요.');
+    return;
+  }
+  if (amount > _partialRepayCurrentArrears) {
+    alert(`변제 금액은 미수금액(${_partialRepayCurrentArrears.toLocaleString('ko-KR')}원)을 초과할 수 없습니다.`);
+    return;
+  }
+  const newArrears = _partialRepayCurrentArrears - amount;
+  try {
+    await api.customers.update(_partialRepayCustomerId, { arrears: newArrears });
+    closePartialRepayModal();
+    loadArrears();
+  } catch (e) {
+    alert(e?.detail || '변제 처리 실패');
+  }
+}
+
+function updateArrearsSortIcons() {
+  document.querySelectorAll('#tab-arrears th.sortable').forEach(th => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (th.dataset.sort === arrearsSortCol) {
+      th.classList.add(arrearsSortAsc ? 'sort-asc' : 'sort-desc');
+    }
+  });
+}
+
+function bindArrearsSortHandlers() {
+  document.querySelectorAll('#tab-arrears th.sortable').forEach(th => {
+    th.onclick = () => {
+      arrearsSortCol = th.dataset.sort;
+      arrearsSortAsc = !arrearsSortAsc;
+      loadArrears();
+    };
+  });
 }
 
 function updateCustomerSortIcons() {
