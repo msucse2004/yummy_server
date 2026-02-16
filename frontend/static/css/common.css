@@ -25,6 +25,27 @@ body {
   box-sizing: border-box;
 }
 
+.login-locale-select {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 10;
+}
+.login-locale-select select {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 0.9rem;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.login-locale-select select:focus {
+  outline: none;
+  border-color: var(--highlight);
+}
+
 .login-box {
   background: var(--card);
   padding: clamp(1.25rem, 4vw, 2rem);
@@ -58,6 +79,19 @@ body {
   font-size: clamp(0.9rem, 2.5vw, 1rem);
 }
 
+.login-box .form-group { margin-bottom: 0.75rem; }
+.login-box .form-group label { color: var(--muted); font-size: 0.9rem; }
+.login-box .form-group select {
+  width: 100%;
+  padding: clamp(0.65rem, 2vw, 0.75rem) 1rem;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.08);
+  color: var(--text);
+  font-size: clamp(0.9rem, 2.5vw, 1rem);
+  cursor: pointer;
+}
+
 .login-box button {
   width: 100%;
   padding: clamp(0.7rem, 2vw, 0.85rem) 1rem;
@@ -88,12 +122,32 @@ body {
   margin-top: 1rem;
 }
 
+.login-box .login-actions { margin-top: 1rem; text-align: center; }
+.login-box .btn-link {
+  background: none;
+  border: none;
+  color: var(--highlight);
+  cursor: pointer;
+  font-size: 0.95rem;
+  text-decoration: underline;
+  padding: 0;
+}
+.login-box .btn-link:hover { opacity: 0.9; }
+.login-box #signupSection h2 { margin: 0 0 1rem; font-size: 1.1rem; }
+.signup-username-wrap { display: flex; align-items: center; gap: 0.5rem; }
+.signup-username-wrap input { flex: 1; }
+.username-status { font-size: 1.2rem; min-width: 1.5rem; }
+.username-status.ok { color: #27ae60; }
+.username-status.fail { color: #e74c3c; }
+
 /* App shell */
 .app-shell {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
 }
+
+.pending-approval { padding: 2rem 1rem; flex: 1; }
 
 .app-header {
   background: var(--card);
@@ -173,6 +227,13 @@ tr.plan-row-clickable { cursor: pointer; }
 
 .arrears-clickable { cursor: pointer; text-decoration: underline; }
 .arrears-clickable:hover { opacity: 0.9; }
+
+.status-clickable { cursor: pointer; text-decoration: underline; }
+.status-clickable:hover { opacity: 0.9; }
+.department-clickable { cursor: pointer; text-decoration: underline; }
+.department-clickable:hover { opacity: 0.9; }
+.route-clickable { cursor: pointer; text-decoration: underline; }
+.route-clickable:hover { opacity: 0.9; }
 
 /* Links - 카드/테이블 내 링크 가독성 */
 .card a,
@@ -259,6 +320,8 @@ table a:hover {
   box-shadow: 0 8px 32px rgba(0,0,0,0.4);
 }
 .modal-box h3 { margin: 0 0 1rem; font-size: 1.1rem; }
+.modal-box .error { color: var(--highlight); }
+.form-help { font-size: 0.85rem; color: var(--muted); margin: 0.25rem 0 0; }
 .modal-actions {
   display: flex;
   gap: 0.5rem;

@@ -15,6 +15,31 @@ async function fetchApi(path, options = {}) {
 }
 
 const api = {
+  async checkUsername(username) {
+    const res = await fetch(API_BASE + '/auth/check-username?' + new URLSearchParams({ username: (username || '').trim() }), {
+      credentials: 'include',
+    });
+    const data = await res.json().catch(() => ({}));
+    return data?.available ?? false;
+  },
+  async signup(username, password, displayName, phone, preferredLocale = null) {
+    const body = {
+      username: username.trim(),
+      password,
+      display_name: displayName?.trim() || '',
+      phone: phone?.trim() || '',
+    };
+    if (preferredLocale && String(preferredLocale).trim()) body.preferred_locale = String(preferredLocale).trim();
+    const res = await fetch(API_BASE + '/auth/signup', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw { detail: data.detail || '회원가입 실패' };
+    return data;
+  },
   async login(username, password) {
     const res = await fetch(API_BASE + '/auth/login', {
       method: 'POST',
@@ -33,6 +58,19 @@ const api = {
     try {
       return await fetchApi('/auth/me');
     } catch { return null; }
+  },
+  async changePassword(currentPassword, newPassword) {
+    const res = await fetch(API_BASE + '/auth/change-password', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw { detail: data.detail || '비밀번호 변경 실패' };
   },
   customers: {
     list: () => fetchApi('/customers'),
@@ -117,5 +155,15 @@ const api = {
     create: (d) => fetchApi('/users', { method: 'POST', body: JSON.stringify(d) }),
     update: (id, d) => fetchApi(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(d) }),
     delete: (id) => fetch(API_BASE + `/users/${id}`, { method: 'DELETE', credentials: 'include' }),
+    setPassword: (id, password) => fetch(API_BASE + `/users/${id}/set-password`, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    }).then(r => { if (!r.ok) return r.json().then(d => { throw { detail: d.detail || '비밀번호 설정 실패' }; }); }),
+    setTemporaryPassword: (id, password) => fetch(API_BASE + `/users/${id}/set-temporary-password`, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    }).then(r => { if (!r.ok) return r.json().then(d => { throw { detail: d.detail || '임시 비밀번호 설정 실패' }; }); }),
   },
 };

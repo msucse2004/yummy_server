@@ -22,14 +22,16 @@ STATUS_VALUES = frozenset({"승인요청중", "재직", "퇴사"})
 
 
 class UserCreateSchema(BaseModel):
-    username: str = Field(..., min_length=1, max_length=64)
+    username: str = Field(..., min_length=1, max_length=64, description="한글, 영문, 숫자 등 다국어 문자 지원")
     password: str = Field(..., min_length=6)
     role: Role = Role.DRIVER
     display_name: str | None = Field(None, max_length=128)
     ssn: str | None = Field(None, max_length=32)
     phone: str | None = Field(None, max_length=32)
     resume: str | None = None
+    department: str | None = Field(None, max_length=64)
     status: str | None = Field(None, max_length=32)
+    preferred_locale: str | None = Field(None, max_length=64)
 
     @field_validator("status")
     @classmethod
@@ -47,7 +49,9 @@ class UserUpdateSchema(BaseModel):
     ssn: str | None = Field(None, max_length=32)
     phone: str | None = Field(None, max_length=32)
     resume: str | None = None
+    department: str | None = Field(None, max_length=64)
     status: str | None = Field(None, max_length=32)
+    preferred_locale: str | None = Field(None, max_length=64)
 
     @field_validator("status")
     @classmethod
@@ -102,7 +106,9 @@ def create_user(
         ssn=data.ssn,
         phone=data.phone,
         resume=data.resume,
+        department=data.department,
         status=data.status,
+        preferred_locale=(data.preferred_locale or "").strip() or "대한민국",
     )
     db.add(user)
     db.commit()
@@ -223,6 +229,44 @@ def import_users_excel(
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"파일 처리 실패: {str(e)}")
+
+
+class SetPasswordSchema(BaseModel):
+    password: str = Field(..., min_length=4)
+
+
+@router.post("/{user_id}/set-password", status_code=status.HTTP_204_NO_CONTENT)
+def set_user_password(
+    user_id: int,
+    data: SetPasswordSchema,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+    _: User = RequireAdmin,
+):
+    """관리자가 사용자 비밀번호 직접 변경"""
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
+    user.password_hash = hash_password(data.password)
+    user.must_change_password = False
+    db.commit()
+
+
+@router.post("/{user_id}/set-temporary-password", status_code=status.HTTP_204_NO_CONTENT)
+def set_temporary_password(
+    user_id: int,
+    data: SetPasswordSchema,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+    _: User = RequireAdmin,
+):
+    """관리자가 임시 비밀번호 설정, 사용자가 해당 비밀번호로 로그인 시 비밀번호 변경 필수"""
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
+    user.password_hash = hash_password(data.password)
+    user.must_change_password = True
+    db.commit()
 
 
 @router.patch("/{user_id}", response_model=UserResponse)

@@ -151,7 +151,89 @@
               <input type="file" id="userExcelInput" accept=".xlsx" style="display:none" onchange="importUsersExcel(event)">
             </label>
           </p>
-          <table><thead><tr><th>아이디</th><th>권한</th><th>이름</th><th>주민번호</th><th>전화번호</th><th>이력서</th><th>상태</th><th></th></tr></thead><tbody id="usersList"></tbody></table>
+          <table><thead><tr><th>아이디</th><th>권한</th><th>이름</th><th>전화번호</th><th>부서배정</th><th>선호언어</th><th>상태</th><th></th></tr></thead><tbody id="usersList"></tbody></table>
+        </div>
+      </div>
+
+      <div id="departmentEditModal" class="modal-overlay" style="display:none" onclick="if(event.target===this) closeDepartmentEditModal()">
+        <div class="modal-box" onclick="event.stopPropagation()">
+          <h3>부서 배정</h3>
+          <p id="departmentEditUserName" class="form-group"></p>
+          <p class="form-group">
+            <label for="departmentEditSelect">부서(루트)</label>
+            <select id="departmentEditSelect">
+              <option value="">선택</option>
+            </select>
+          </p>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" onclick="closeDepartmentEditModal()">취소</button>
+            <button type="button" class="btn btn-primary" onclick="submitDepartmentEdit()">저장</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="approveUserModal" class="modal-overlay" style="display:none" onclick="if(event.target===this) closeApproveUserModal()">
+        <div class="modal-box" onclick="event.stopPropagation()">
+          <h3>승인 및 부서 배정</h3>
+          <p id="approveUserName" class="form-group"></p>
+          <p class="form-group">
+            <label for="approveDepartmentSelect">부서(루트) *</label>
+            <select id="approveDepartmentSelect">
+              <option value="">선택</option>
+            </select>
+          </p>
+          <p id="approveError" class="error" style="margin-top:0.5rem; font-size:0.9rem;"></p>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" onclick="closeApproveUserModal()">취소</button>
+            <button type="button" class="btn btn-primary" onclick="submitApproveUser()">승인</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="statusEditModal" class="modal-overlay" style="display:none" onclick="if(event.target===this) closeStatusEditModal()">
+        <div class="modal-box" onclick="event.stopPropagation()">
+          <h3>사용자 상태 변경</h3>
+          <p id="statusEditUserName" class="form-group"></p>
+          <p class="form-group">
+            <label for="statusEditSelect">상태</label>
+            <select id="statusEditSelect">
+              <option value="">선택</option>
+              <option value="승인요청중">승인요청중</option>
+              <option value="재직">재직</option>
+              <option value="퇴사">퇴사</option>
+            </select>
+          </p>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" onclick="closeStatusEditModal()">취소</button>
+            <button type="button" class="btn btn-primary" onclick="submitStatusEdit()">저장</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="passwordChangeModal" class="modal-overlay" style="display:none" onclick="if(event.target===this) closePasswordChangeModal()">
+        <div class="modal-box" onclick="event.stopPropagation()">
+          <h3>비밀번호 변경</h3>
+          <p id="passwordChangeUserName" class="form-group"></p>
+          <div class="form-group">
+            <label><input type="radio" name="passwordChangeMode" value="admin" checked> 관리자가 비밀번호 직접 변경</label>
+          </div>
+          <div id="passwordChangeAdminPanel" class="form-group">
+            <label for="passwordChangeNew">새 비밀번호</label>
+            <input type="password" id="passwordChangeNew" placeholder="4자 이상" minlength="4">
+          </div>
+          <div class="form-group">
+            <label><input type="radio" name="passwordChangeMode" value="user"> 사용자가 변경 (임시 비밀번호 설정)</label>
+            <div id="passwordChangeUserPanel" class="form-group" style="display:none; margin-left:1.5rem;">
+              <label for="passwordChangeTemporary">임시 비밀번호</label>
+              <input type="password" id="passwordChangeTemporary" placeholder="4자 이상" minlength="4">
+              <p class="form-help">사용자가 이 비밀번호로 로그인하면 비밀번호 변경 페이지로 이동합니다.</p>
+            </div>
+          </div>
+          <p id="passwordChangeError" class="error" style="margin-top:0.5rem; font-size:0.9rem;"></p>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" onclick="closePasswordChangeModal()">취소</button>
+            <button type="button" class="btn btn-primary" onclick="submitPasswordChange()">적용</button>
+          </div>
         </div>
       </div>
 
@@ -162,7 +244,7 @@
             <input type="hidden" id="userId" value="">
             <div class="form-group">
               <label for="userUsername">아이디 *</label>
-              <input type="text" id="userUsername" required placeholder="아이디" autocomplete="username">
+              <input type="text" id="userUsername" required placeholder="아이디 (한글, 영문, 숫자 등)" autocomplete="username" maxlength="64">
             </div>
             <div class="form-group" id="userPasswordGroup">
               <label for="userPassword">비밀번호 *</label>
@@ -188,8 +270,27 @@
               <input type="text" id="userPhone" placeholder="전화번호">
             </div>
             <div class="form-group">
+              <label for="userDepartment">부서배정</label>
+              <input type="text" id="userDepartment" placeholder="예: 1호차, 배송팀">
+            </div>
+            <div class="form-group">
               <label for="userResume">이력서</label>
               <input type="text" id="userResume" placeholder="이력서">
+            </div>
+            <div class="form-group">
+              <label for="userPreferredLocale">선호언어</label>
+              <select id="userPreferredLocale">
+                <option value="대한민국">🇰🇷 한국어</option>
+                <option value="미국">🇺🇸 English</option>
+                <option value="일본">🇯🇵 日本語</option>
+                <option value="简体中文">🇨🇳 简体中文</option>
+                <option value="繁體中文">🇨🇳 繁體中文</option>
+                <option value="베트남">🇻🇳 Tiếng Việt</option>
+                <option value="라오스">🇱🇦 ພາສາລາວ</option>
+                <option value="캄보디아">🇰🇭 ភាសាខ្មែរ</option>
+                <option value="인도">🇮🇳 हिन्दी</option>
+                <option value="파키스탄">🇵🇰 اردو</option>
+              </select>
             </div>
             <div class="form-group">
               <label for="userStatus">상태</label>
@@ -330,6 +431,23 @@
           <button type="submit" class="btn btn-primary">저장</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <div id="customerRouteEditModal" class="modal-overlay" style="display:none" onclick="if(event.target===this) closeCustomerRouteEditModal()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <h3>루트 변경</h3>
+      <p id="customerRouteEditName" class="form-group"></p>
+      <p class="form-group">
+        <label for="customerRouteEditSelect">루트</label>
+        <select id="customerRouteEditSelect">
+          <option value="">선택</option>
+        </select>
+      </p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeCustomerRouteEditModal()">취소</button>
+        <button type="button" class="btn btn-primary" onclick="submitCustomerRouteEdit()">저장</button>
+      </div>
     </div>
   </div>
 

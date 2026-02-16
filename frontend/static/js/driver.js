@@ -1,10 +1,68 @@
+let currentUser = null;
+
 (async () => {
   const user = await api.me();
+  currentUser = user;
   if (!user || user.role !== 'DRIVER') {
     location.href = '/';
     return;
   }
+  if (user.must_change_password) {
+    location.href = '/change-password.html';
+    return;
+  }
+  if (user.status === '승인요청중') {
+    document.getElementById('pendingApprovalSection').style.display = 'block';
+    document.getElementById('driverMain').style.display = 'none';
+    return;
+  }
+  if (user.status === '퇴사') {
+    document.getElementById('pendingApprovalSection').style.display = 'block';
+    document.getElementById('pendingApprovalSection').querySelector('h2').textContent = '퇴사 처리된 계정';
+    document.getElementById('pendingApprovalSection').querySelector('p').textContent = '퇴사 처리된 계정은 이용할 수 없습니다.';
+    document.getElementById('driverMain').style.display = 'none';
+    return;
+  }
+  bindDriverTabs();
+  loadPlans();
 })();
+
+function bindDriverTabs() {
+  document.querySelectorAll('#driverMain .nav-tabs a').forEach(a => {
+    a.onclick = (e) => {
+      e.preventDefault();
+      document.querySelectorAll('#driverMain .nav-tabs a').forEach(x => x.classList.remove('active'));
+      document.querySelectorAll('#driverMain .tab-content').forEach(x => { x.style.display = 'none'; });
+      a.classList.add('active');
+      const tab = a.dataset.tab;
+      const el = document.getElementById('tab-' + tab);
+      if (el) el.style.display = 'block';
+      if (tab === 'plans') loadPlans();
+      if (tab === 'myinfo') loadMyInfo();
+    };
+  });
+}
+
+function loadMyInfo() {
+  if (!currentUser) return;
+  const u = currentUser;
+  const localeMap = { '대한민국': '🇰🇷 한국어', '미국': '🇺🇸 English', '일본': '🇯🇵 日本語', '简体中文': '🇨🇳 简体中文', '繁體中文': '🇨🇳 繁體中文', '중국': '🇨🇳 简体中文', '베트남': '🇻🇳 Tiếng Việt', '라오스': '🇱🇦 ພາສາລາວ', '캄보디아': '🇰🇭 ភាសាខ្មែរ', '인도': '🇮🇳 हिन्दी', '파키스탄': '🇵🇰 اردو' };
+  const localeDisplay = localeMap[u.preferred_locale] || u.preferred_locale || '-';
+  const formatPhone = (p) => {
+    if (!p || !String(p).trim()) return '-';
+    const d = String(p).replace(/\D/g, '');
+    if (d.length === 11 && d.startsWith('010')) return d.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
+    return p;
+  };
+  document.getElementById('myInfoContent').innerHTML = `
+    <p><strong>아이디</strong> ${u.username || '-'}</p>
+    <p><strong>이름</strong> ${u.display_name || '-'}</p>
+    <p><strong>전화번호</strong> ${formatPhone(u.phone) || '-'}</p>
+    <p><strong>부서(루트)</strong> ${u.department || '-'}</p>
+    <p><strong>선호언어</strong> ${localeDisplay}</p>
+    <p><strong>상태</strong> ${u.status || '-'}</p>
+  `;
+}
 
 async function doLogout() {
   await api.logout();
@@ -95,5 +153,3 @@ function backToPlans() {
   document.getElementById('plansSection').style.display = 'block';
   loadPlans();
 }
-
-loadPlans();

@@ -8,23 +8,457 @@
   <link rel="stylesheet" href="/css/common.css">
 </head>
 <body class="login-page">
+  <div class="login-locale-select">
+    <select id="loginPreferredLocale">
+      <option value="대한민국" selected>🇰🇷 한국어</option>
+      <option value="미국">🇺🇸 English</option>
+      <option value="일본">🇯🇵 日本語</option>
+      <option value="简体中文">🇨🇳 简体中文</option>
+      <option value="繁體中文">🇨🇳 繁體中文</option>
+      <option value="베트남">🇻🇳 Tiếng Việt</option>
+      <option value="라오스">🇱🇦 ພາສາລາວ</option>
+      <option value="캄보디아">🇰🇭 ភាសាខ្មែរ</option>
+      <option value="인도">🇮🇳 हिन्दी</option>
+      <option value="파키스탄">🇵🇰 اردو</option>
+    </select>
+  </div>
   <main class="login-box">
-    <h1>(주) 맛나 영농 법인</h1>
-    <p class="subtitle">배송/물류 관리</p>
-    <form id="loginForm">
-      <input type="text" id="username" placeholder="아이디" required autocomplete="username">
-      <input type="password" id="password" placeholder="비밀번호" required autocomplete="current-password">
-      <button type="submit">로그인</button>
+    <h1 data-i18n="companyName">(주) 맛나 영농 법인</h1>
+    <p class="subtitle" data-i18n="subtitle">배송/물류 관리</p>
+    <form id="loginForm" accept-charset="UTF-8">
+      <input type="text" id="username" data-i18n-placeholder="usernamePlaceholder" placeholder="아이디" required autocomplete="username" maxlength="64">
+      <input type="password" id="password" data-i18n-placeholder="passwordPlaceholder" placeholder="비밀번호" required autocomplete="current-password">
+      <button type="submit" data-i18n="loginBtn">로그인</button>
+      <p class="login-actions"><button type="button" class="btn-link" onclick="showSignupForm()" data-i18n="signupLink">회원가입</button></p>
     </form>
     <p id="error" class="error"></p>
+
+    <div id="signupSection" style="display:none">
+      <h2 data-i18n="signupTitle">회원가입</h2>
+      <form id="signupForm" accept-charset="UTF-8">
+        <div class="signup-username-wrap">
+          <input type="text" id="signupUsername" data-i18n-placeholder="signupUsernamePlaceholder" placeholder="아이디 (한글, 영문, 숫자 등)" required autocomplete="username" minlength="1" maxlength="64" onblur="checkSignupUsername()">
+          <span id="signupUsernameStatus" class="username-status" data-i18n-title="usernameCheckHint" title="입력 후 다른 곳을 클릭하면 중복 확인"></span>
+        </div>
+        <input type="password" id="signupPassword" data-i18n-placeholder="signupPasswordPlaceholder" placeholder="비밀번호 (4자 이상)" required autocomplete="new-password" minlength="4">
+        <input type="text" id="signupDisplayName" data-i18n-placeholder="signupDisplayNamePlaceholder" placeholder="이름 *" required autocomplete="name">
+        <input type="tel" id="signupPhone" data-i18n-placeholder="signupPhonePlaceholder" placeholder="전화번호 *" required autocomplete="tel">
+        <div class="form-group">
+          <label for="signupPreferredLocale" data-i18n="signupPreferredLocaleLabel">선호언어</label>
+          <select id="signupPreferredLocale">
+            <option value="대한민국" selected>🇰🇷 한국어</option>
+            <option value="미국">🇺🇸 English</option>
+            <option value="일본">🇯🇵 日本語</option>
+            <option value="简体中文">🇨🇳 简体中文</option>
+            <option value="繁體中文">🇨🇳 繁體中文</option>
+            <option value="베트남">🇻🇳 Tiếng Việt</option>
+            <option value="라오스">🇱🇦 ພາສາລາວ</option>
+            <option value="캄보디아">🇰🇭 ភាសាខ្មែរ</option>
+            <option value="인도">🇮🇳 हिन्दी</option>
+            <option value="파키스탄">🇵🇰 اردو</option>
+          </select>
+        </div>
+        <button type="submit" data-i18n="signupBtn">가입하기</button>
+        <p class="login-actions"><button type="button" class="btn-link" onclick="showLoginForm()" data-i18n="backToLogin">로그인으로 돌아가기</button></p>
+      </form>
+      <p id="signupError" class="error"></p>
+    </div>
   </main>
   <script src="/js/api.js"></script>
   <script>
+    const I18N = {
+      대한민국: {
+        companyName: '(주) 맛나',
+        subtitle: '배송/물류 관리',
+        usernamePlaceholder: '아이디',
+        passwordPlaceholder: '비밀번호',
+        loginBtn: '로그인',
+        signupLink: '회원가입',
+        signupTitle: '회원가입',
+        signupUsernamePlaceholder: '아이디 (한글, 영문, 숫자 등)',
+        signupPasswordPlaceholder: '비밀번호 (4자 이상)',
+        signupDisplayNamePlaceholder: '이름 *',
+        signupPhonePlaceholder: '전화번호 *',
+        signupPreferredLocaleLabel: '선호언어',
+        signupBtn: '가입하기',
+        backToLogin: '로그인으로 돌아가기',
+        usernameCheckHint: '입력 후 다른 곳을 클릭하면 중복 확인',
+        usernameAvailable: '사용 가능한 아이디입니다',
+        usernameTaken: '이미 사용 중인 아이디입니다',
+        errUsernameRequired: '아이디를 입력하세요.',
+        errPasswordMin: '비밀번호는 4자 이상 입력하세요.',
+        errDisplayNameRequired: '이름을 입력하세요.',
+        errPhoneRequired: '전화번호를 입력하세요.',
+        errUsernameTaken: '이미 사용 중인 아이디입니다.',
+        msgSignupSuccess: '회원가입이 완료되었습니다. 관리자 승인 후 로그인하실 수 있습니다.',
+        msgPendingApproval: '승인 대기중입니다. 관리자 승인 후 이용 가능합니다.',
+        msgResigned: '퇴사 처리된 계정입니다.',
+        errLoginFail: '로그인 실패',
+        errSignupFail: '회원가입 실패',
+        pageTitleLogin: '로그인',
+      },
+      미국: {
+        companyName: 'Yummy Inc.',
+        subtitle: 'Delivery & Logistics',
+        usernamePlaceholder: 'Username',
+        passwordPlaceholder: 'Password',
+        loginBtn: 'Log in',
+        signupLink: 'Sign up',
+        signupTitle: 'Sign up',
+        signupUsernamePlaceholder: 'Username (letters, numbers)',
+        signupPasswordPlaceholder: 'Password (min 4 chars)',
+        signupDisplayNamePlaceholder: 'Name *',
+        signupPhonePlaceholder: 'Phone *',
+        signupPreferredLocaleLabel: 'Preferred language',
+        signupBtn: 'Sign up',
+        backToLogin: 'Back to login',
+        usernameCheckHint: 'Click elsewhere to check availability',
+        usernameAvailable: 'Username is available',
+        usernameTaken: 'Username is already taken',
+        errUsernameRequired: 'Please enter username.',
+        errPasswordMin: 'Password must be at least 4 characters.',
+        errDisplayNameRequired: 'Please enter name.',
+        errPhoneRequired: 'Please enter phone number.',
+        errUsernameTaken: 'Username is already taken.',
+        msgSignupSuccess: 'Sign up complete. You can log in after admin approval.',
+        msgPendingApproval: 'Pending approval. Please wait for admin approval.',
+        msgResigned: 'This account has been resigned.',
+        errLoginFail: 'Login failed',
+        errSignupFail: 'Sign up failed',
+        pageTitleLogin: 'Log in',
+      },
+      일본: {
+        companyName: '株式会社ヤミー',
+        subtitle: '配送・物流管理',
+        usernamePlaceholder: 'ユーザーID',
+        passwordPlaceholder: 'パスワード',
+        loginBtn: 'ログイン',
+        signupLink: '会員登録',
+        signupTitle: '会員登録',
+        signupUsernamePlaceholder: 'ユーザーID（英数字など）',
+        signupPasswordPlaceholder: 'パスワード（4文字以上）',
+        signupDisplayNamePlaceholder: '氏名 *',
+        signupPhonePlaceholder: '電話番号 *',
+        signupPreferredLocaleLabel: '希望言語',
+        signupBtn: '登録する',
+        backToLogin: 'ログインに戻る',
+        usernameCheckHint: '他をクリックすると重複確認',
+        usernameAvailable: '利用可能なIDです',
+        usernameTaken: '既に使用されています',
+        errUsernameRequired: 'ユーザーIDを入力してください。',
+        errPasswordMin: 'パスワードは4文字以上入力してください。',
+        errDisplayNameRequired: '氏名を入力してください。',
+        errPhoneRequired: '電話番号を入力してください。',
+        errUsernameTaken: '既に使用されているIDです。',
+        msgSignupSuccess: '登録が完了しました。管理者の承認後にログインできます。',
+        msgPendingApproval: '承認待ちです。管理者の承認後にご利用いただけます。',
+        msgResigned: '退職処理済みのアカウントです。',
+        errLoginFail: 'ログイン失敗',
+        errSignupFail: '登録失敗',
+        pageTitleLogin: 'ログイン',
+      },
+      '简体中文': {
+        companyName: 'Yummy有限公司',
+        subtitle: '配送与物流管理',
+        usernamePlaceholder: '用户名',
+        passwordPlaceholder: '密码',
+        loginBtn: '登录',
+        signupLink: '注册',
+        signupTitle: '注册',
+        signupUsernamePlaceholder: '用户名（字母、数字等）',
+        signupPasswordPlaceholder: '密码（4位以上）',
+        signupDisplayNamePlaceholder: '姓名 *',
+        signupPhonePlaceholder: '电话 *',
+        signupPreferredLocaleLabel: '首选语言',
+        signupBtn: '注册',
+        backToLogin: '返回登录',
+        usernameCheckHint: '点击其他地方检查是否可用',
+        usernameAvailable: '用户名可用',
+        usernameTaken: '用户名已被使用',
+        errUsernameRequired: '请输入用户名。',
+        errPasswordMin: '密码至少4位。',
+        errDisplayNameRequired: '请输入姓名。',
+        errPhoneRequired: '请输入电话号码。',
+        errUsernameTaken: '用户名已被使用。',
+        msgSignupSuccess: '注册完成。管理员批准后可登录。',
+        msgPendingApproval: '等待批准。管理员批准后即可使用。',
+        msgResigned: '该账户已离职。',
+        errLoginFail: '登录失败',
+        errSignupFail: '注册失败',
+        pageTitleLogin: '登录',
+      },
+      '繁體中文': {
+        companyName: '株式会社ヤミー',
+        subtitle: '配送與物流管理',
+        usernamePlaceholder: '用戶名',
+        passwordPlaceholder: '密碼',
+        loginBtn: '登入',
+        signupLink: '註冊',
+        signupTitle: '註冊',
+        signupUsernamePlaceholder: '用戶名（字母、數字等）',
+        signupPasswordPlaceholder: '密碼（4位以上）',
+        signupDisplayNamePlaceholder: '姓名 *',
+        signupPhonePlaceholder: '電話 *',
+        signupPreferredLocaleLabel: '首選語言',
+        signupBtn: '註冊',
+        backToLogin: '返回登入',
+        usernameCheckHint: '點擊其他處檢查是否可用',
+        usernameAvailable: '用戶名可用',
+        usernameTaken: '用戶名已被使用',
+        errUsernameRequired: '請輸入用戶名。',
+        errPasswordMin: '密碼至少4位。',
+        errDisplayNameRequired: '請輸入姓名。',
+        errPhoneRequired: '請輸入電話號碼。',
+        errUsernameTaken: '用戶名已被使用。',
+        msgSignupSuccess: '註冊完成。管理員批准後可登入。',
+        msgPendingApproval: '等待批准。管理員批准後即可使用。',
+        msgResigned: '該帳戶已離職。',
+        errLoginFail: '登入失敗',
+        errSignupFail: '註冊失敗',
+        pageTitleLogin: '登入',
+      },
+      베트남: {
+        companyName: 'Công ty Yummy',
+        subtitle: 'Quản lý giao hàng & Logistics',
+        usernamePlaceholder: 'Tên đăng nhập',
+        passwordPlaceholder: 'Mật khẩu',
+        loginBtn: 'Đăng nhập',
+        signupLink: 'Đăng ký',
+        signupTitle: 'Đăng ký',
+        signupUsernamePlaceholder: 'Tên đăng nhập (chữ, số)',
+        signupPasswordPlaceholder: 'Mật khẩu (ít nhất 4 ký tự)',
+        signupDisplayNamePlaceholder: 'Họ tên *',
+        signupPhonePlaceholder: 'Số điện thoại *',
+        signupPreferredLocaleLabel: 'Ngôn ngữ ưu tiên',
+        signupBtn: 'Đăng ký',
+        backToLogin: 'Quay lại đăng nhập',
+        usernameCheckHint: 'Nhấn ra ngoài để kiểm tra',
+        usernameAvailable: 'Tên đăng nhập có sẵn',
+        usernameTaken: 'Tên đăng nhập đã được sử dụng',
+        errUsernameRequired: 'Vui lòng nhập tên đăng nhập.',
+        errPasswordMin: 'Mật khẩu phải có ít nhất 4 ký tự.',
+        errDisplayNameRequired: 'Vui lòng nhập họ tên.',
+        errPhoneRequired: 'Vui lòng nhập số điện thoại.',
+        errUsernameTaken: 'Tên đăng nhập đã được sử dụng.',
+        msgSignupSuccess: 'Đăng ký hoàn tất. Bạn có thể đăng nhập sau khi quản trị viên phê duyệt.',
+        msgPendingApproval: 'Đang chờ phê duyệt. Vui lòng chờ quản trị viên xác nhận.',
+        msgResigned: 'Tài khoản này đã nghỉ việc.',
+        errLoginFail: 'Đăng nhập thất bại',
+        errSignupFail: 'Đăng ký thất bại',
+        pageTitleLogin: 'Đăng nhập',
+      },
+      라오스: {
+        companyName: 'ບໍລິສັດ ຢັມມີ',
+        subtitle: 'ຈັດສົ່ງ ແລະ ລະບົບຄົວຄານ',
+        usernamePlaceholder: 'ຊື່ຜູ້ໃຊ້',
+        passwordPlaceholder: 'ລະຫັດຜ່ານ',
+        loginBtn: 'ເຂົ້າສູ່ລະບົບ',
+        signupLink: 'ລົງທະບຽນ',
+        signupTitle: 'ລົງທະບຽນ',
+        signupUsernamePlaceholder: 'ຊື່ຜູ້ໃຊ້ (ຕົວອັກສອນ, ເລກ)',
+        signupPasswordPlaceholder: 'ລະຫັດຜ່ານ (ຢ່າງໜ້ອຍ 4 ຕົວອັກສອນ)',
+        signupDisplayNamePlaceholder: 'ຊື່ *',
+        signupPhonePlaceholder: 'ເບີໂທ *',
+        signupPreferredLocaleLabel: 'ພາສາທີ່ຕ້ອງການ',
+        signupBtn: 'ລົງທະບຽນ',
+        backToLogin: 'ກັບໄປເຂົ້າສູ່ລະບົບ',
+        usernameCheckHint: 'ຄລິກນອກເພື່ອກວດສອບ',
+        usernameAvailable: 'ຊື່ຜູ້ໃຊ້ພ້ອມໃຊ້',
+        usernameTaken: 'ຊື່ຜູ້ໃຊ້ຖືກໃຊ້ແລ້ວ',
+        errUsernameRequired: 'ກະລຸນາປ້ອນຊື່ຜູ້ໃຊ້.',
+        errPasswordMin: 'ລະຫັດຜ່ານຕ້ອງມີຢ່າງໜ້ອຍ 4 ຕົວອັກສອນ.',
+        errDisplayNameRequired: 'ກະລຸນາປ້ອນຊື່.',
+        errPhoneRequired: 'ກະລຸນາປ້ອນເບີໂທ.',
+        errUsernameTaken: 'ຊື່ຜູ້ໃຊ້ຖືກໃຊ້ແລ້ວ.',
+        msgSignupSuccess: 'ລົງທະບຽນສຳເລັດ. ທ່ານສາມາດເຂົ້າສູ່ລະບົບໄດ້ຫຼັງອະນຸມັດຈາກຜູ້ບໍລິຫານ.',
+        msgPendingApproval: 'ລໍຖ້າອະນຸມັດ. ກະລຸນາລໍຖ້າຜູ້ບໍລິຫານອະນຸມັດ.',
+        msgResigned: 'ບັນຊີນີ້ລຶບອອກແລ້ວ.',
+        errLoginFail: 'ເຂົ້າສູ່ລະບົບບໍ່ສຳເລັດ',
+        errSignupFail: 'ລົງທະບຽນບໍ່ສຳເລັດ',
+        pageTitleLogin: 'ເຂົ້າສູ່ລະບົບ',
+      },
+      캄보디아: {
+        companyName: 'ក្រុមហ៊ុន យោមមី',
+        subtitle: 'ដឹកជញ្ជូន និង ឡូជីស្ទិច',
+        usernamePlaceholder: 'ឈ្មោះគណនី',
+        passwordPlaceholder: 'ពាក្យសម្ងាត់',
+        loginBtn: 'ចូល',
+        signupLink: 'ចុះឈ្មោះ',
+        signupTitle: 'ចុះឈ្មោះ',
+        signupUsernamePlaceholder: 'ឈ្មោះគណនី (អក្សរ, លេខ)',
+        signupPasswordPlaceholder: 'ពាក្យសម្ងាត់ (យ៉ាងហោចណាស់ 4 តួ)',
+        signupDisplayNamePlaceholder: 'ឈ្មោះ *',
+        signupPhonePlaceholder: 'ទូរស័ព្ទ *',
+        signupPreferredLocaleLabel: 'ភាសាដែលចូលចិត្ត',
+        signupBtn: 'ចុះឈ្មោះ',
+        backToLogin: 'ត្រឡប់ចូល',
+        usernameCheckHint: 'ចូរចុចនៅកន្លែងផ្សេងដើម្បីពិនិត្យ',
+        usernameAvailable: 'ឈ្មោះគណនីអាចប្រើបាន',
+        usernameTaken: 'ឈ្មោះគណនីត្រូវបានប្រើរួចហើយ',
+        errUsernameRequired: 'សូមបញ្ចូលឈ្មោះគណនី។',
+        errPasswordMin: 'ពាក្យសម្ងាត់ត្រូវមានយ៉ាងហោចណាស់ 4 តួ។',
+        errDisplayNameRequired: 'សូមបញ្ចូលឈ្មោះ។',
+        errPhoneRequired: 'សូមបញ្ចូលលេខទូរស័ព្ទ។',
+        errUsernameTaken: 'ឈ្មោះគណនីត្រូវបានប្រើរួចហើយ។',
+        msgSignupSuccess: 'ចុះឈ្មោះរួចរាល់។ អ្នកអាចចូលបានបន្ទាប់ពីអ្នកគ្រប់គ្រងយល់ព្រម។',
+        msgPendingApproval: 'ការរង់ចាំការយល់ព្រម។ សូមរង់ចាំអ្នកគ្រប់គ្រងយល់ព្រម។',
+        msgResigned: 'គណនីនេះត្រូវបានចាកចេញរួចហើយ។',
+        errLoginFail: 'ចូលមិនជោគជ័យ',
+        errSignupFail: 'ចុះឈ្មោះមិនជោគជ័យ',
+        pageTitleLogin: 'ចូល',
+      },
+      인도: {
+        companyName: 'Yummy Pvt. Ltd.',
+        subtitle: 'वितरण और रसद प्रबंधन',
+        usernamePlaceholder: 'उपयोगकर्ता नाम',
+        passwordPlaceholder: 'पासवर्ड',
+        loginBtn: 'लॉग इन करें',
+        signupLink: 'साइन अप करें',
+        signupTitle: 'साइन अप करें',
+        signupUsernamePlaceholder: 'उपयोगकर्ता नाम (अक्षर, संख्या)',
+        signupPasswordPlaceholder: 'पासवर्ड (कम से कम 4 अक्षर)',
+        signupDisplayNamePlaceholder: 'नाम *',
+        signupPhonePlaceholder: 'फोन *',
+        signupPreferredLocaleLabel: 'पसंदीदा भाषा',
+        signupBtn: 'साइन अप करें',
+        backToLogin: 'लॉग इन पर वापस जाएं',
+        usernameCheckHint: 'उपलब्धता जांचने के लिए कहीं और क्लिक करें',
+        usernameAvailable: 'उपयोगकर्ता नाम उपलब्ध है',
+        usernameTaken: 'उपयोगकर्ता नाम पहले से लिया गया है',
+        errUsernameRequired: 'कृपया उपयोगकर्ता नाम दर्ज करें।',
+        errPasswordMin: 'पासवर्ड कम से कम 4 अक्षरों का होना चाहिए।',
+        errDisplayNameRequired: 'कृपया नाम दर्ज करें।',
+        errPhoneRequired: 'कृपया फोन नंबर दर्ज करें।',
+        errUsernameTaken: 'उपयोगकर्ता नाम पहले से लिया गया है।',
+        msgSignupSuccess: 'साइन अप पूर्ण। प्रशासक की मंजूरी के बाद आप लॉग इन कर सकते हैं।',
+        msgPendingApproval: 'मंजूरी की प्रतीक्षा में। कृपया प्रशासक की मंजूरी की प्रतीक्षा करें।',
+        msgResigned: 'यह खाता इस्तीफा दे दिया गया है।',
+        errLoginFail: 'लॉग इन विफल',
+        errSignupFail: 'साइन अप विफल',
+        pageTitleLogin: 'लॉग इन करें',
+      },
+      파키스탄: {
+        companyName: 'Yummy (Pvt.) Ltd.',
+        subtitle: 'ڈیلیوری اور لاجسٹکس',
+        usernamePlaceholder: 'صارف نام',
+        passwordPlaceholder: 'پاس ورڈ',
+        loginBtn: 'لاگ ان',
+        signupLink: 'سائن اپ',
+        signupTitle: 'سائن اپ',
+        signupUsernamePlaceholder: 'صارف نام (حروف، اعداد)',
+        signupPasswordPlaceholder: 'پاس ورڈ (کم از کم 4 حروف)',
+        signupDisplayNamePlaceholder: 'نام *',
+        signupPhonePlaceholder: 'فون *',
+        signupPreferredLocaleLabel: 'پسندیدہ زبان',
+        signupBtn: 'سائن اپ',
+        backToLogin: 'لاگ ان پر واپس',
+        usernameCheckHint: 'دستیابی چیک کرنے کے لیے کہیں اور کلک کریں',
+        usernameAvailable: 'صارف نام دستیاب ہے',
+        usernameTaken: 'صارف نام پہلے سے استعمال میں ہے',
+        errUsernameRequired: 'براہ کرم صارف نام درج کریں۔',
+        errPasswordMin: 'پاس ورڈ کم از کم 4 حروف کا ہونا چاہیے۔',
+        errDisplayNameRequired: 'براہ کرم نام درج کریں۔',
+        errPhoneRequired: 'براہ کرم فون نمبر درج کریں۔',
+        errUsernameTaken: 'صارف نام پہلے سے استعمال میں ہے۔',
+        msgSignupSuccess: 'سائن اپ مکمل۔ ایڈمن کی منظوری کے بعد آپ لاگ ان کر سکتے ہیں۔',
+        msgPendingApproval: 'منظوری کا انتظار۔ براہ کرم ایڈمن کی منظوری کا انتظار کریں۔',
+        msgResigned: 'یہ اکاؤنٹ استعفیٰ دے دیا گیا ہے۔',
+        errLoginFail: 'لاگ ان ناکام',
+        errSignupFail: 'سائن اپ ناکام',
+        pageTitleLogin: 'لاگ ان',
+      },
+    };
+
+    let currentLocale = '대한민국';
+
+    function t(key) {
+      const L = I18N[currentLocale] || I18N['대한민국'];
+      return L[key] ?? I18N['대한민국'][key] ?? key;
+    }
+
+    function applyLocale(locale) {
+      currentLocale = locale || '대한민국';
+      const L = I18N[currentLocale] || I18N['대한민국'];
+      document.body.dir = (currentLocale === '파키스탄') ? 'rtl' : 'ltr';
+      document.title = 'Yummy(맛나) - ' + (L.pageTitleLogin || '로그인');
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (key && L[key]) el.textContent = L[key];
+      });
+      document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        if (key && L[key]) el.placeholder = L[key];
+      });
+      document.querySelectorAll('[data-i18n-title]').forEach(el => {
+        const key = el.getAttribute('data-i18n-title');
+        if (key && L[key]) el.title = L[key];
+      });
+    }
+
+    document.getElementById('loginPreferredLocale').addEventListener('change', (e) => {
+      applyLocale(e.target.value);
+    });
+
+    applyLocale(document.getElementById('loginPreferredLocale').value);
+
+    function showSignupForm() {
+      document.getElementById('loginForm').style.display = 'none';
+      document.getElementById('error').style.display = 'none';
+      document.getElementById('signupSection').style.display = 'block';
+      document.getElementById('signupError').textContent = '';
+      const statusEl = document.getElementById('signupUsernameStatus');
+      if (statusEl) { statusEl.textContent = ''; statusEl.className = 'username-status'; }
+      const loginPref = document.getElementById('loginPreferredLocale')?.value;
+      const signupPref = document.getElementById('signupPreferredLocale');
+      if (loginPref && signupPref && Array.from(signupPref.options).some(o => o.value === loginPref)) {
+        signupPref.value = loginPref;
+      }
+    }
+    function showLoginForm() {
+      document.getElementById('signupSection').style.display = 'none';
+      document.getElementById('loginForm').style.display = 'block';
+      document.getElementById('error').style.display = 'block';
+      document.getElementById('error').textContent = '';
+      const statusEl = document.getElementById('signupUsernameStatus');
+      if (statusEl) { statusEl.textContent = ''; statusEl.className = 'username-status'; }
+    }
+
+    async function checkSignupUsername() {
+      const inp = document.getElementById('signupUsername');
+      const statusEl = document.getElementById('signupUsernameStatus');
+      if (!inp || !statusEl) return;
+      const username = inp.value.trim();
+      if (!username) {
+        statusEl.textContent = '';
+        statusEl.className = 'username-status';
+        return;
+      }
+      try {
+        const available = await api.checkUsername(username);
+        statusEl.textContent = available ? '✓' : '✗';
+        statusEl.className = 'username-status ' + (available ? 'ok' : 'fail');
+        statusEl.title = available ? t('usernameAvailable') : t('usernameTaken');
+      } catch (e) {
+        statusEl.textContent = '';
+        statusEl.className = 'username-status';
+      }
+    }
+
     (async () => {
       const user = await api.me();
       if (user) {
-        location.href = user.role === 'ADMIN' ? '/admin.html' : '/driver.html';
-        return;
+        if (user.must_change_password) {
+          location.href = '/change-password.html';
+          return;
+        }
+        if (user.role === 'ADMIN') {
+          location.href = '/admin.html';
+          return;
+        }
+        if (user.role === 'DRIVER') {
+          location.href = '/driver.html';
+          return;
+        }
       }
     })();
 
@@ -36,13 +470,57 @@
       const password = document.getElementById('password').value;
       try {
         const res = await api.login(username, password);
-        if (res.ok) {
-          location.href = res.user.role === 'ADMIN' ? '/admin.html' : '/driver.html';
+        if (res.ok && res.user) {
+          if (res.user.must_change_password) {
+            location.href = '/change-password.html';
+            return;
+          }
+          if (res.user.role === 'ADMIN') {
+            location.href = '/admin.html';
+            return;
+          }
+          if (res.user.role === 'DRIVER' && res.user.status === '승인요청중') {
+            err.textContent = t('msgPendingApproval');
+            return;
+          }
+          if (res.user.role === 'DRIVER' && res.user.status === '퇴사') {
+            err.textContent = t('msgResigned');
+            return;
+          }
+          location.href = '/driver.html';
         } else {
-          err.textContent = res.detail || '로그인 실패';
+          err.textContent = res.detail || t('errLoginFail');
         }
       } catch (e) {
-        err.textContent = e.detail || e.message || '로그인 실패';
+        err.textContent = e.detail || e.message || t('errLoginFail');
+      }
+    };
+
+    document.getElementById('signupForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const err = document.getElementById('signupError');
+      err.textContent = '';
+      const username = document.getElementById('signupUsername').value.trim();
+      const password = document.getElementById('signupPassword').value;
+      const displayName = document.getElementById('signupDisplayName').value.trim();
+      const phone = document.getElementById('signupPhone').value.trim();
+      if (!username) { err.textContent = t('errUsernameRequired'); return; }
+      if (password.length < 4) { err.textContent = t('errPasswordMin'); return; }
+      if (!displayName) { err.textContent = t('errDisplayNameRequired'); return; }
+      if (!phone) { err.textContent = t('errPhoneRequired'); return; }
+      const statusEl = document.getElementById('signupUsernameStatus');
+      if (statusEl?.classList?.contains('fail')) {
+        err.textContent = t('errUsernameTaken');
+        return;
+      }
+      try {
+        const preferredLocale = document.getElementById('signupPreferredLocale')?.value?.trim() || '대한민국';
+        await api.signup(username, password, displayName, phone, preferredLocale);
+        alert(t('msgSignupSuccess'));
+        showLoginForm();
+        document.getElementById('username').value = username;
+      } catch (e) {
+        err.textContent = e.detail || e.message || t('errSignupFail');
       }
     };
   </script>

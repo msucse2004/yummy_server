@@ -1,7 +1,31 @@
+/** 선호언어 value → 표시 텍스트(국기+언어명) 맵핑 - 로그인 페이지와 동일 */
+const PREFERRED_LOCALE_MAP = {
+  '대한민국': '🇰🇷 한국어',
+  '미국': '🇺🇸 English',
+  '일본': '🇯🇵 日本語',
+  '简体中文': '🇨🇳 简体中文',
+  '繁體中文': '🇨🇳 繁體中文',
+  '중국': '🇨🇳 简体中文',
+  '베트남': '🇻🇳 Tiếng Việt',
+  '라오스': '🇱🇦 ພາສາລາວ',
+  '캄보디아': '🇰🇭 ភាសាខ្មែរ',
+  '인도': '🇮🇳 हिन्दी',
+  '파키스탄': '🇵🇰 اردو',
+};
+
+function getLocaleDisplay(value) {
+  if (!value || !String(value).trim()) return PREFERRED_LOCALE_MAP['대한민국'] || '🇰🇷 한국어';
+  return PREFERRED_LOCALE_MAP[value] ?? value;
+}
+
 (async () => {
   const user = await api.me();
   if (!user || user.role !== 'ADMIN') {
     location.href = '/';
+    return;
+  }
+  if (user.must_change_password) {
+    location.href = '/change-password.html';
     return;
   }
 })();
@@ -698,7 +722,7 @@ function renderCustomers() {
     return `
     <tr>
       <td>${c.code || '-'}</td>
-      <td>${c.route || '-'}</td>
+      <td class="route-clickable" title="클릭하여 루트 변경" onclick='showCustomerRouteEditModal(${c.id}, ${JSON.stringify(c.route || '')}, ${JSON.stringify(c.name || '')})'>${c.route || '-'}</td>
       <td>${c.name}</td>
       <td>${c.business_registration_number || '-'}</td>
       <td>${c.representative_name || '-'}</td>
@@ -824,8 +848,7 @@ function normalizeRouteForSelect(route) {
   return m ? m[1] + '호차' : '';
 }
 
-async function populateCustomerRouteSelect() {
-  const sel = document.getElementById('customerRoute');
+async function populateRouteSelectOptions(sel) {
   if (!sel) return;
   sel.innerHTML = '<option value="">선택</option>';
   try {
@@ -844,6 +867,53 @@ async function populateCustomerRouteSelect() {
       opt.textContent = i + '호차';
       sel.appendChild(opt);
     }
+  }
+}
+
+async function populateCustomerRouteSelect() {
+  await populateRouteSelectOptions(document.getElementById('customerRoute'));
+}
+
+let _customerRouteEditId = null;
+
+async function populateCustomerRouteEditSelect() {
+  await populateRouteSelectOptions(document.getElementById('customerRouteEditSelect'));
+}
+
+function showCustomerRouteEditModal(customerId, currentRoute, customerName) {
+  _customerRouteEditId = customerId;
+  document.getElementById('customerRouteEditName').textContent = customerName || '거래처';
+  const routeVal = normalizeRouteForSelect(currentRoute);
+  populateCustomerRouteEditSelect().then(() => {
+    const sel = document.getElementById('customerRouteEditSelect');
+    if (!sel) return;
+    if (routeVal && !Array.from(sel.options).some(o => o.value === routeVal)) {
+      const opt = document.createElement('option');
+      opt.value = routeVal;
+      opt.textContent = routeVal;
+      sel.appendChild(opt);
+    }
+    sel.value = routeVal || '';
+  });
+  document.getElementById('customerRouteEditModal').style.display = 'flex';
+}
+
+function closeCustomerRouteEditModal() {
+  document.getElementById('customerRouteEditModal').style.display = 'none';
+  _customerRouteEditId = null;
+}
+
+async function submitCustomerRouteEdit() {
+  if (!_customerRouteEditId) return;
+  const newVal = document.getElementById('customerRouteEditSelect').value.trim() || null;
+  try {
+    await api.customers.update(_customerRouteEditId, { route: newVal });
+    const c = customersData.find(x => x.id === _customerRouteEditId);
+    if (c) c.route = newVal;
+    closeCustomerRouteEditModal();
+    renderCustomers();
+  } catch (e) {
+    alert(e?.detail || e?.message || '루트 변경 실패');
   }
 }
 
@@ -1211,7 +1281,7 @@ function renderUsers() {
     const q = userSearchTerm;
     list = list.filter(u => {
       const s = [
-        u.username, u.display_name, u.ssn, u.phone, u.resume, u.status,
+        u.username, u.display_name, u.phone, u.department, u.status, u.preferred_locale,
         u.role === 'ADMIN' ? '관리자' : '기사'
       ].filter(Boolean).join(' ').toLowerCase();
       return s.includes(q);
@@ -1222,17 +1292,195 @@ function renderUsers() {
       <td>${u.username}</td>
       <td>${u.role === 'ADMIN' ? '관리자' : '기사'}</td>
       <td>${u.display_name || '-'}</td>
-      <td>${u.ssn || '-'}</td>
-      <td>${u.phone || '-'}</td>
-      <td>${u.resume ? (u.resume.length > 20 ? u.resume.slice(0, 20) + '...' : u.resume) : '-'}</td>
-      <td>${u.status || '-'}</td>
+      <td>${formatPhone(u.phone) || '-'}</td>
+      <td class="department-clickable" title="클릭하여 부서 배정" onclick='showDepartmentEditModal(${u.id}, ${JSON.stringify(u.department || '')}, ${JSON.stringify(u.display_name || u.username || '')})'>${u.department || '-'}</td>
+      <td>${getLocaleDisplay(u.preferred_locale)}</td>
+      <td class="status-clickable" title="클릭하여 상태 변경" onclick='showStatusEditModal(${u.id}, ${JSON.stringify(u.status || '')}, ${JSON.stringify(u.display_name || u.username || '')})'>${u.status || '-'}</td>
       <td>
-        ${u.status === '승인요청중' ? `<button class="btn btn-primary" onclick="approveUser(${u.id})">승인하기</button> ` : ''}
-        <button class="btn btn-secondary" onclick="showUserEditForm(${u.id})">수정</button>
-        <button class="btn btn-secondary" onclick="deleteUser(${u.id})">삭제</button>
+        ${u.status === '승인요청중' ? `<button type="button" class="btn btn-primary" onclick='showApproveUserModal(${u.id}, ${JSON.stringify(u.display_name || u.username || '')})'>승인하기</button> ` : ''}
+        <button type="button" class="btn btn-secondary" onclick="showUserEditForm(${u.id})">수정</button>
+        <button type="button" class="btn btn-secondary" onclick='showPasswordChangeModal(${u.id}, ${JSON.stringify(u.display_name || u.username || '')})'>비밀번호 변경</button>
+        ${u.username !== 'admin' ? `<button type="button" class="btn btn-secondary" onclick="deleteUser(${u.id})">삭제</button>` : ''}
       </td>
     </tr>
   `).join('');
+}
+
+function formatPhone(phone) {
+  if (!phone || !String(phone).trim()) return '';
+  const digits = String(phone).replace(/\D/g, '');
+  if (digits.length === 0) return phone.trim();
+  if (digits.length === 11 && digits.startsWith('010')) return digits.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
+  if (digits.length === 10 && digits.startsWith('02')) return digits.replace(/(\d{2})(\d{4})(\d{4})/, '$1-$2-$3');
+  if (digits.length === 10 && /^01[16-9]/.test(digits)) return digits.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+  if (digits.length === 10) return digits.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+  if (digits.length === 9 && digits.startsWith('02')) return digits.replace(/(\d{2})(\d{3})(\d{4})/, '$1-$2-$3');
+  if (digits.length >= 8) return digits.replace(/(\d{3,4})(\d{4})/, '$1-$2');
+  return phone.trim();
+}
+
+let _departmentEditUserId = null;
+let _approveUserId = null;
+
+async function populateApproveDepartmentSelect() {
+  const sel = document.getElementById('approveDepartmentSelect');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">선택</option>';
+  try {
+    const s = await api.settings.get();
+    const n = s.delivery_route_count ?? 5;
+    for (let i = 1; i <= n; i++) {
+      const opt = document.createElement('option');
+      opt.value = i + '호차';
+      opt.textContent = i + '호차';
+      sel.appendChild(opt);
+    }
+  } catch {
+    for (let i = 1; i <= 5; i++) {
+      const opt = document.createElement('option');
+      opt.value = i + '호차';
+      opt.textContent = i + '호차';
+      sel.appendChild(opt);
+    }
+  }
+}
+
+function showApproveUserModal(userId, userName) {
+  _approveUserId = userId;
+  document.getElementById('approveUserName').textContent = userName || '사용자';
+  document.getElementById('approveError').textContent = '';
+  const u = usersData.find(x => x.id === userId);
+  const currentVal = (u?.department || '').trim();
+  populateApproveDepartmentSelect().then(() => {
+    const sel = document.getElementById('approveDepartmentSelect');
+    if (!sel) return;
+    if (currentVal && !Array.from(sel.options).some(o => o.value === currentVal)) {
+      const opt = document.createElement('option');
+      opt.value = currentVal;
+      opt.textContent = currentVal;
+      sel.appendChild(opt);
+    }
+    sel.value = currentVal || '';
+  });
+  document.getElementById('approveUserModal').style.display = 'flex';
+}
+
+function closeApproveUserModal() {
+  document.getElementById('approveUserModal').style.display = 'none';
+  _approveUserId = null;
+}
+
+async function submitApproveUser() {
+  if (!_approveUserId) return;
+  const errEl = document.getElementById('approveError');
+  errEl.textContent = '';
+  const department = document.getElementById('approveDepartmentSelect').value.trim() || null;
+  if (!department) {
+    errEl.textContent = '부서를 선택해주세요.';
+    return;
+  }
+  try {
+    await api.users.update(_approveUserId, { department, status: '재직' });
+    const u = usersData.find(x => x.id === _approveUserId);
+    if (u) {
+      u.department = department;
+      u.status = '재직';
+    }
+    closeApproveUserModal();
+    renderUsers();
+  } catch (e) {
+    errEl.textContent = e?.detail || e?.message || '승인 실패';
+  }
+}
+
+async function populateDepartmentRouteSelect() {
+  const sel = document.getElementById('departmentEditSelect');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">선택</option>';
+  try {
+    const s = await api.settings.get();
+    const n = s.delivery_route_count ?? 5;
+    for (let i = 1; i <= n; i++) {
+      const opt = document.createElement('option');
+      opt.value = i + '호차';
+      opt.textContent = i + '호차';
+      sel.appendChild(opt);
+    }
+  } catch {
+    for (let i = 1; i <= 5; i++) {
+      const opt = document.createElement('option');
+      opt.value = i + '호차';
+      opt.textContent = i + '호차';
+      sel.appendChild(opt);
+    }
+  }
+}
+
+function showDepartmentEditModal(userId, currentDepartment, userName) {
+  _departmentEditUserId = userId;
+  document.getElementById('departmentEditUserName').textContent = userName || '사용자';
+  const currentVal = (currentDepartment || '').trim();
+  populateDepartmentRouteSelect().then(() => {
+    const sel = document.getElementById('departmentEditSelect');
+    if (!sel) return;
+    if (currentVal && !Array.from(sel.options).some(o => o.value === currentVal)) {
+      const opt = document.createElement('option');
+      opt.value = currentVal;
+      opt.textContent = currentVal;
+      sel.appendChild(opt);
+    }
+    sel.value = currentVal || '';
+  });
+  document.getElementById('departmentEditModal').style.display = 'flex';
+}
+
+function closeDepartmentEditModal() {
+  document.getElementById('departmentEditModal').style.display = 'none';
+  _departmentEditUserId = null;
+}
+
+async function submitDepartmentEdit() {
+  if (!_departmentEditUserId) return;
+  const newVal = document.getElementById('departmentEditSelect').value.trim() || null;
+  try {
+    await api.users.update(_departmentEditUserId, { department: newVal });
+    const u = usersData.find(x => x.id === _departmentEditUserId);
+    if (u) u.department = newVal;
+    closeDepartmentEditModal();
+    renderUsers();
+  } catch (e) {
+    alert(e?.detail || e?.message || '부서 배정 실패');
+  }
+}
+
+let _statusEditUserId = null;
+
+function showStatusEditModal(userId, currentStatus, userName) {
+  _statusEditUserId = userId;
+  document.getElementById('statusEditUserName').textContent = userName || '사용자';
+  const sel = document.getElementById('statusEditSelect');
+  sel.value = currentStatus || '';
+  document.getElementById('statusEditModal').style.display = 'flex';
+  sel.focus();
+}
+
+function closeStatusEditModal() {
+  document.getElementById('statusEditModal').style.display = 'none';
+  _statusEditUserId = null;
+}
+
+async function submitStatusEdit() {
+  if (!_statusEditUserId) return;
+  const newVal = document.getElementById('statusEditSelect').value || null;
+  try {
+    await api.users.update(_statusEditUserId, { status: newVal });
+    const u = usersData.find(x => x.id === _statusEditUserId);
+    if (u) u.status = newVal;
+    closeStatusEditModal();
+    renderUsers();
+  } catch (e) {
+    alert(e?.detail || e?.message || '상태 변경 실패');
+  }
 }
 
 function showUserForm() {
@@ -1246,7 +1494,9 @@ function showUserForm() {
   document.getElementById('userRole').value = 'DRIVER';
   document.getElementById('userSsn').value = '';
   document.getElementById('userPhone').value = '';
+  document.getElementById('userDepartment').value = '';
   document.getElementById('userResume').value = '';
+  document.getElementById('userPreferredLocale').value = '대한민국';
   document.getElementById('userStatus').value = '';
   document.getElementById('userModal').style.display = 'flex';
 }
@@ -1265,7 +1515,17 @@ function showUserEditForm(id) {
     document.getElementById('userRole').value = u.role || 'DRIVER';
     document.getElementById('userSsn').value = u.ssn || '';
     document.getElementById('userPhone').value = u.phone || '';
+    document.getElementById('userDepartment').value = u.department || '';
     document.getElementById('userResume').value = u.resume || '';
+    const prefVal = u.preferred_locale || '대한민국';
+    const prefSel = document.getElementById('userPreferredLocale');
+    if (prefVal && !Array.from(prefSel.options).some(o => o.value === prefVal)) {
+      const opt = document.createElement('option');
+      opt.value = prefVal;
+      opt.textContent = getLocaleDisplay(prefVal);
+      prefSel.appendChild(opt);
+    }
+    prefSel.value = prefVal;
     document.getElementById('userStatus').value = u.status || '';
     document.getElementById('userModal').style.display = 'flex';
   });
@@ -1275,13 +1535,66 @@ function closeUserModal() {
   document.getElementById('userModal').style.display = 'none';
 }
 
-async function approveUser(id) {
+let _passwordChangeUserId = null;
+
+function showPasswordChangeModal(userId, userName) {
+  _passwordChangeUserId = userId;
+  document.getElementById('passwordChangeUserName').textContent = userName || '사용자';
+  document.getElementById('passwordChangeError').textContent = '';
+  document.getElementById('passwordChangeNew').value = '';
+  document.getElementById('passwordChangeTemporary').value = '';
+  document.querySelector('input[name="passwordChangeMode"][value="admin"]').checked = true;
+  document.getElementById('passwordChangeAdminPanel').style.display = 'block';
+  document.getElementById('passwordChangeUserPanel').style.display = 'none';
+  document.getElementById('passwordChangeModal').style.display = 'flex';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('input[name="passwordChangeMode"]').forEach(r => {
+    r.addEventListener('change', updatePasswordChangeModeUI);
+  });
+});
+
+function closePasswordChangeModal() {
+  document.getElementById('passwordChangeModal').style.display = 'none';
+  _passwordChangeUserId = null;
+}
+
+function updatePasswordChangeModeUI() {
+  const isAdmin = document.querySelector('input[name="passwordChangeMode"]:checked')?.value === 'admin';
+  document.getElementById('passwordChangeAdminPanel').style.display = isAdmin ? 'block' : 'none';
+  document.getElementById('passwordChangeUserPanel').style.display = isAdmin ? 'none' : 'block';
+}
+
+async function submitPasswordChange() {
+  if (!_passwordChangeUserId) return;
+  const errEl = document.getElementById('passwordChangeError');
+  errEl.textContent = '';
+  const mode = document.querySelector('input[name="passwordChangeMode"]:checked')?.value;
   try {
-    await api.users.update(id, { status: '재직' });
-    loadUsers();
+    if (mode === 'admin') {
+      const newPw = document.getElementById('passwordChangeNew').value;
+      if (!newPw || newPw.length < 4) {
+        errEl.textContent = '비밀번호는 4자 이상 입력하세요.';
+        return;
+      }
+      await api.users.setPassword(_passwordChangeUserId, newPw);
+      alert('비밀번호가 변경되었습니다.');
+      closePasswordChangeModal();
+      loadUsers();
+    } else {
+      const tempPw = document.getElementById('passwordChangeTemporary').value;
+      if (!tempPw || tempPw.length < 4) {
+        errEl.textContent = '임시 비밀번호는 4자 이상 입력하세요.';
+        return;
+      }
+      await api.users.setTemporaryPassword(_passwordChangeUserId, tempPw);
+      alert('임시 비밀번호가 설정되었습니다. 사용자가 해당 비밀번호로 로그인하면 비밀번호 변경 페이지로 이동합니다.');
+      closePasswordChangeModal();
+      loadUsers();
+    }
   } catch (e) {
-    const msg = e?.detail || e?.message || '승인 실패';
-    alert(Array.isArray(msg) ? msg.join('; ') : msg);
+    errEl.textContent = e?.detail || e?.message || '처리 실패';
   }
 }
 
@@ -1313,15 +1626,17 @@ if (userFormEl) userFormEl.onsubmit = async (e) => {
   const role = document.getElementById('userRole').value;
   const ssn = document.getElementById('userSsn').value.trim() || null;
   const phone = document.getElementById('userPhone').value.trim() || null;
+  const department = document.getElementById('userDepartment').value.trim() || null;
   const resume = document.getElementById('userResume').value.trim() || null;
+  const preferred_locale = document.getElementById('userPreferredLocale').value.trim() || '대한민국';
   const status = document.getElementById('userStatus').value.trim() || null;
   if (!username) { alert('아이디를 입력하세요'); return; }
   try {
     if (id) {
-      await api.users.update(parseInt(id), { display_name, role, ssn, phone, resume, status });
+      await api.users.update(parseInt(id), { display_name, role, ssn, phone, department, resume, preferred_locale, status });
     } else {
       if (!password || password.length < 6) { alert('비밀번호 6자 이상 필요'); return; }
-      await api.users.create({ username, password, role, display_name, ssn, phone, resume, status });
+      await api.users.create({ username, password, role, display_name, ssn, phone, department, resume, preferred_locale, status });
     }
     closeUserModal();
     loadUsers();
